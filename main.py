@@ -1,0 +1,136 @@
+"""
+Локальная транскрибация на лету — этап 1 (без диаризации).
+
+Запуск:
+    python main.py
+
+Остановка: Ctrl+C
+"""
+import signal
+import time
+from pathlib import Path
+
+import numpy as np
+import structlog
+import yaml
+
+from audio.capture import AudioCapture
+from audio.vad import VADProcessor
+from transcribe.factory import create_transcriber
+from output.writer import JSONWriter
+
+logger = structlog.get_logger(__name__)
+
+CONFIG_PATH = Path("config.yaml")
+
+
+def load_config() -> dict:
+    if not CONFIG_PATH.exists():
+        raise FileNotFoundError(f"Файл конфига не найден: {CONFIG_PATH}")
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def main() -> None:
+    config = load_config()
+
+    audio_cfg = config.get("audio", {})
+    vad_cfg = config.get("vad", {})
+    model_cfg = config.get("model", {})
+    output_cfg = config.get("output", {})
+
+    sample_rate: int = audio_cfg.get("sample_rate", 16000)
+    chunk_ms: int = audio_cfg.get("chunk_ms", 500)
+    silence_duration: float = audio_cfg.get("silence_duration", 1.5)
+
+    logger.info("Инициализация компонентов...")
+
+    vad = VADProcessor(
+        threshold=vad_cfg.get("threshold", 0.5),
+        min_speech_ms=vad_cfg.get("min_speech_ms", 250),
+    )
+    transcriber = create_transcriber(model_cfg)
+    capture = AudioCapture(sample_rate=sample_rate, chunk_ms=chunk_ms)
+    writer = JSONWriter(output_dir=output_cfg.get("dir", "meetings"))
+    writer.start_meeting()
+
+    # Сколько тихих чанков подряд = конец сегмента
+    silence_threshold = int(silence_duration * 1000 / chunk_ms)
+    # Принудительная нарезка длинных сегментов (для RAG)
+    max_segment_chunks = int(30_000 / chunk_ms)  # 30 секунд
+
+    speech_buffer: list[np.ndarray] = []
+    silence_count = 0
+    segment_start: float | None = None
+    meeting_start = time.monotonic()
+
+    stop = False
+
+    def handle_signal(sig, frame):
+        nonlocal stop
+        print("\nЗавершение записи...")
+        stop = True
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    print("Запись началась. Нажмите Ctrl+C для остановки.\n")
+    capture.start()
+
+    try:
+        while not stop:
+            chunk = capture.get_chunk(timeout=1.0)
+            if chunk is None:
+                continue
+
+            now = time.monotonic() - meeting_start
+            is_speech = vad.is_speech(chunk)
+
+            if is_speech:
+                if not speech_buffer:
+                    segment_start = now
+                speech_buffer.append(chunk)
+                silence_count = 0
+
+                # Принудительно нарезаем если сегмент > 30 сек
+                if len(speech_buffer) >= max_segment_chunks:
+                    audio_segment = np.concatenate(speech_buffer)
+                    result = transcriber.transcribe(audio_segment)
+                    if result.text:
+                        writer.write_segment(start=segment_start, end=now, text=result.text)
+                        print(f"[{segment_start:.1f}s] {result.text}")
+                    speech_buffer = []
+                    silence_count = 0
+                    segment_start = now
+            else:
+                if speech_buffer:
+                    silence_count += 1
+                    speech_buffer.append(chunk)  # немного тишины для контекста модели
+
+                    if silence_count >= silence_threshold:
+                        # Транскрибируем накопленный сегмент
+                        audio_segment = np.concatenate(speech_buffer)
+                        segment_end = now
+
+                        result = transcriber.transcribe(audio_segment)
+
+                        if result.text:
+                            writer.write_segment(
+                                start=segment_start,
+                                end=segment_end,
+                                text=result.text,
+                            )
+                            print(f"[{segment_start:.1f}s] {result.text}")
+
+                        speech_buffer = []
+                        silence_count = 0
+                        segment_start = None
+    finally:
+        capture.stop()
+        output_path = writer.finish()
+        if output_path:
+            print(f"\nЗапись сохранена: {output_path}")
+
+
+if __name__ == "__main__":
+    main()

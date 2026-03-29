@@ -1,0 +1,27 @@
+audio:
+  sample_rate: 16000
+  chunk_ms: 500          # размер чанка в мс
+  silence_duration: 1.5  # секунд тишины для завершения сегмента
+
+vad:
+  threshold: 0.5
+  min_speech_ms: 250
+
+model:
+  type: "gigaam"  # "gigaam" или "whisper"
+  gigaam:
+    type: "ctc"   # "ctc" или "transducer" (transducer точнее на ~1%)
+    model_path: "models/gigaam-v3/model.int8.onnx"
+    tokens_path: "models/gigaam-v3/tokens.txt"
+    encoder_path: "models/gigaam-v3-rnnt/encoder.int8.onnx"
+    decoder_path: "models/gigaam-v3-rnnt/decoder.onnx"
+    joiner_path: "models/gigaam-v3-rnnt/joiner.int8.onnx"
+    rnnt_tokens_path: "models/gigaam-v3-rnnt/tokens.txt"
+  whisper:
+    model: "large-v3"
+    language: "ru"
+    device: "cuda"
+    compute_type: "float16"
+
+output:
+  dir: "meetings"

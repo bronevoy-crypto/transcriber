@@ -1,0 +1,9 @@
+pyaudiowpatch
+numpy
+structlog
+pyyaml
+torch
+sherpa-onnx
+faster-whisper
+scipy
+huggingface_hub
