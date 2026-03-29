@@ -78,17 +78,3 @@ vad:
   silence_duration: 1.5   # секунд тишины для завершения сегмента
 ```
 
-## Смена модели
-
-По умолчанию стоит GigaAM v3 — русская модель, WER ~9%. Для переключения на Whisper изменить в `config.yaml`:
-
-```yaml
-model:
-  type: "whisper"
-```
-
-Для более точной версии GigaAM (WER ~8%):
-```bash
-python download_models.py --rnnt
-```
-Затем в `config.yaml` изменить `gigaam.type: "transducer"`.
