@@ -7,18 +7,29 @@
 ## Что нужно
 
 - Windows 10/11
-- Python 3.10+
+- Python 3.10+ — скачать с [python.org](https://python.org)
 - NVIDIA GPU (8+ GB VRAM)
-- ~500 MB для модели
+- ~500 MB свободного места для модели
 
 ## Установка
 
+Открыть терминал (Win+R → ввести `cmd` → Enter) и выполнить по очереди:
+
+**1. Скачать проект**
 ```bash
-pip install -r requirements.txt
-python download_models.py
+git clone https://github.com/HRYNdev/transcriber
+cd transcriber
 ```
 
-Всё. Модель скачается сама.
+**2. Установить зависимости**
+```bash
+pip install -r requirements.txt
+```
+
+**3. Скачать модель GigaAM (~500 MB)**
+```bash
+python download_models.py
+```
 
 ## Запуск
 
@@ -26,11 +37,13 @@ python download_models.py
 python main.py
 ```
 
-Запускать до начала встречи. Захват идёт через WASAPI loopback — VB-Cable не нужен, приложение само слышит всё что играет на ПК.
+Запускать до начала встречи. Приложение само захватывает системный звук — VB-Cable не нужен.
 
-Остановить — Ctrl+C. Результат появится в папке `meetings/`.
+Остановить — **Ctrl+C**. Результат появится в папке `meetings/`.
 
 ## Как выглядит результат
+
+Файл называется по дате и времени: `2024-01-15_10-30-00.json`
 
 ```json
 {
@@ -54,23 +67,28 @@ python main.py
 
 ## Настройки
 
-Всё меняется в `config.yaml` — модель, чувствительность VAD, длина паузы между сегментами. Перезапуск после изменений.
+Все параметры меняются в файле `config.yaml`. После изменений перезапустить приложение.
 
 ```yaml
 model:
   type: "gigaam"   # gigaam или whisper
 
 vad:
-  threshold: 0.5          # чувствительность (ниже = чувствительнее)
+  threshold: 0.5          # чувствительность к голосу (0.1–0.9, ниже = чувствительнее)
   silence_duration: 1.5   # секунд тишины для завершения сегмента
 ```
 
-## Модели
+## Смена модели
 
-По умолчанию стоит GigaAM v3 — русская модель от Сбера, WER ~9%. Можно переключить на Whisper large-v3 если нужен другой язык.
+По умолчанию стоит GigaAM v3 — русская модель, WER ~9%. Для переключения на Whisper изменить в `config.yaml`:
 
-Для скачивания RNNT версии GigaAM (чуть точнее, WER ~8%):
+```yaml
+model:
+  type: "whisper"
+```
+
+Для более точной версии GigaAM (WER ~8%):
 ```bash
 python download_models.py --rnnt
 ```
-Потом в `config.yaml` изменить `gigaam.type: "transducer"`.
+Затем в `config.yaml` изменить `gigaam.type: "transducer"`.
