@@ -30,7 +30,7 @@ class VADProcessor:
         if len(audio) < self._min_speech_samples:
             return False
 
-        frame_size = 512  # требование silero для 16kHz
+        frame_size = 512
         speech_frames = 0
         total_frames = 0
 

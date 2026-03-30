@@ -53,7 +53,7 @@ class AudioCapture:
         mic_thread = None
 
         try:
-            # Loopback — callback API (работает стабильно)
+            # Loopback
             wasapi_info = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
             speakers = pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
             if not speakers.get("isLoopbackDevice", False):
@@ -77,7 +77,7 @@ class AudioCapture:
             )
             logger.info("AudioCapture: loopback", device=speakers["name"])
 
-            # Микрофон — blocking read в отдельном потоке (надёжнее для WASAPI)
+            # Микрофон
             mic_info = _find_mic(pa)
             mic_rate, mic_ch, mic_frames = None, None, None
             if mic_info:
@@ -158,7 +158,6 @@ def _process(raw: bytes, channels: int, from_rate: int, to_rate: int) -> np.ndar
 def _find_mic(pa) -> dict | None:
     import pyaudiowpatch as pyaudio
 
-    # Определяем индекс WASAPI host API
     wasapi_host_index = None
     try:
         wasapi_info = pa.get_host_api_info_by_type(pyaudio.paWASAPI)

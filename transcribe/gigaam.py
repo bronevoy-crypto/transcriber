@@ -98,4 +98,4 @@ class GigaAMTranscriber(BaseTranscriber):
         elapsed_ms = (time.monotonic() - t0) * 1000
         logger.debug("GigaAMTranscriber: decoded", text=text[:60], latency_ms=round(elapsed_ms))
 
-        return TranscriptionResult(text=text, confidence=0.85 if text else 0.0)
+        return TranscriptionResult(text=text)

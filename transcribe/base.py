@@ -7,7 +7,7 @@ import numpy as np
 @dataclass
 class TranscriptionResult:
     text: str
-    confidence: float
+    confidence: float = 0.0
 
 
 class BaseTranscriber(ABC):
