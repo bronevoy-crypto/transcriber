@@ -10,7 +10,7 @@ vad:
 model:
   type: "gigaam"  # "gigaam" или "whisper"
   gigaam:
-    type: "ctc"   # "ctc" или "transducer" (transducer точнее на ~1%)
+    type: "ctc"   # "ctc" или "transducer"
     model_path: "models/gigaam-v3/model.int8.onnx"
     tokens_path: "models/gigaam-v3/tokens.txt"
     encoder_path: "models/gigaam-v3-rnnt/encoder.int8.onnx"
