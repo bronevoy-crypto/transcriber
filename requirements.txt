@@ -3,6 +3,7 @@ numpy
 structlog
 pyyaml
 torch
+torchaudio
 sherpa-onnx
 faster-whisper
 scipy
