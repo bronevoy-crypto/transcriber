@@ -49,8 +49,7 @@ def main() -> None:
 
     # Сколько тихих чанков подряд = конец сегмента
     silence_threshold = int(silence_duration * 1000 / chunk_ms)
-    # Принудительная нарезка длинных сегментов (для RAG)
-    max_segment_chunks = int(30_000 / chunk_ms)  # 30 секунд
+    max_segment_chunks = int(30_000 / chunk_ms)  # принудительная нарезка каждые 30 сек
 
     speech_buffer: list[np.ndarray] = []
     silence_count = 0
@@ -100,7 +99,7 @@ def main() -> None:
                             print(f"[{segment_start:.1f}s] {result.text}")
                     except Exception as e:
                         logger.warning("Ошибка транскрибации", error=str(e))
-                    segment_start = now  # новый сегмент начинается с текущего момента
+                    segment_start = now
                     speech_buffer = []
                     silence_count = 0
             else:

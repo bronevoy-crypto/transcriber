@@ -27,11 +27,6 @@ class VADProcessor:
         logger.info("VADProcessor: модель загружена")
 
     def is_speech(self, audio: np.ndarray) -> bool:
-        """Вернуть True если в чанке обнаружена речь.
-
-        Silero требует ровно 512 сэмплов на вызов — нарезаем чанк на фреймы.
-        Считаем речью если >30% фреймов прошли порог.
-        """
         if len(audio) < self._min_speech_samples:
             return False
 
