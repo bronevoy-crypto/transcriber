@@ -1,4 +1,4 @@
-"""Захват системного звука (loopback) и микрофона (Windows)."""
+"""Захват системного звука и микрофона (Windows)."""
 import queue
 import threading
 
