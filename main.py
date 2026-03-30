@@ -49,7 +49,7 @@ def main() -> None:
 
     # Сколько тихих чанков подряд = конец сегмента
     silence_threshold = int(silence_duration * 1000 / chunk_ms)
-    max_segment_chunks = int(30_000 / chunk_ms)  # принудительная нарезка каждые 30 сек
+    max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
 
     speech_buffer: list[np.ndarray] = []
     silence_count = 0

@@ -9,7 +9,7 @@
 - Windows 10/11
 - Python 3.10+ — скачать с [python.org](https://python.org)
 - NVIDIA GPU (8+ GB VRAM)
-- ~500 MB свободного места для модели
+- ~3 GB свободного места для модели (Whisper large-v3, скачается автоматически при первом запуске)
 
 ## Установка
 
@@ -24,11 +24,6 @@ cd transcriber
 **2. Установить зависимости**
 ```bash
 pip install -r requirements.txt
-```
-
-**3. Скачать модель GigaAM (~500 MB)**
-```bash
-python download_models.py
 ```
 
 ## Запуск
@@ -71,10 +66,12 @@ python main.py
 
 ```yaml
 model:
-  type: "gigaam"   # gigaam или whisper
+  type: "whisper"   # whisper или gigaam
 
 vad:
   threshold: 0.5          # чувствительность к голосу (0.1–0.9, ниже = чувствительнее)
+
+audio:
   silence_duration: 1.5   # секунд тишины для завершения сегмента
 ```
 

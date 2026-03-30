@@ -2,7 +2,7 @@ from transcribe.base import BaseTranscriber
 
 
 def create_transcriber(config: dict) -> BaseTranscriber:
-    model_type = config.get("type", "gigaam")
+    model_type = config.get("type", "whisper")
 
     if model_type == "gigaam":
         from transcribe.gigaam import GigaAMTranscriber

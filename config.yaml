@@ -8,7 +8,7 @@ vad:
   min_speech_ms: 250
 
 model:
-  type: "gigaam"  # "gigaam" или "whisper"
+  type: "whisper"  # "gigaam" или "whisper"
   gigaam:
     type: "ctc"   # "ctc" или "transducer"
     model_path: "models/gigaam-v3/model.int8.onnx"
