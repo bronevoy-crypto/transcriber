@@ -1,6 +1,7 @@
-"""Захват системного звука через WASAPI loopback (Windows)."""
+"""Захват системного звука (loopback) и микрофона (Windows)."""
 import queue
 import threading
+import time
 
 import numpy as np
 import structlog
@@ -41,61 +42,118 @@ class AudioCapture:
         try:
             import pyaudiowpatch as pyaudio
         except ImportError:
-            logger.error("pyaudiowpatch не установлен. Установите: pip install pyaudiowpatch")
+            logger.error("pyaudiowpatch не установлен: pip install pyaudiowpatch")
             raise
 
         pa = pyaudio.PyAudio()
+        loopback_stream = None
+        mic_stream = None
 
         try:
+            # Loopback
             wasapi_info = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
-            default_speakers = pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
-
-            # Ищем loopback версию устройства вывода
-            if not default_speakers.get("isLoopbackDevice", False):
-                for loopback in pa.get_loopback_device_info_generator():
-                    if default_speakers["name"] in loopback["name"]:
-                        default_speakers = loopback
+            speakers = pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
+            if not speakers.get("isLoopbackDevice", False):
+                for lb in pa.get_loopback_device_info_generator():
+                    if speakers["name"] in lb["name"]:
+                        speakers = lb
                         break
 
-            logger.info("AudioCapture: захват с устройства", device=default_speakers["name"])
+            lb_rate = int(speakers["defaultSampleRate"])
+            lb_channels = max(1, speakers["maxInputChannels"])
+            lb_frames = int(lb_rate * self._chunk_ms / 1000)
 
-            device_rate = int(default_speakers["defaultSampleRate"])
-            device_channels = default_speakers["maxInputChannels"]
-            frames_per_chunk = int(device_rate * self._chunk_ms / 1000)
-
-            stream = pa.open(
+            loopback_stream = pa.open(
                 format=pyaudio.paInt16,
-                channels=device_channels,
-                rate=device_rate,
+                channels=lb_channels,
+                rate=lb_rate,
                 input=True,
-                input_device_index=default_speakers["index"],
-                frames_per_buffer=frames_per_chunk,
+                input_device_index=speakers["index"],
+                frames_per_buffer=lb_frames,
             )
+            logger.info("AudioCapture: loopback", device=speakers["name"])
 
-            try:
-                while not self._stop_event.is_set():
-                    raw = stream.read(frames_per_chunk, exception_on_overflow=False)
-                    audio = np.frombuffer(raw, dtype=np.int16)
+            # Микрофон
+            mic_info = self._find_mic(pa)
+            mic_rate, mic_channels, mic_frames = None, None, None
+            if mic_info:
+                try:
+                    mic_rate = int(mic_info["defaultSampleRate"])
+                    mic_channels = max(1, mic_info["maxInputChannels"])
+                    mic_frames = int(mic_rate * self._chunk_ms / 1000)
+                    mic_stream = pa.open(
+                        format=pyaudio.paInt16,
+                        channels=mic_channels,
+                        rate=mic_rate,
+                        input=True,
+                        input_device_index=mic_info["index"],
+                        frames_per_buffer=mic_frames,
+                    )
+                    logger.info("AudioCapture: микрофон", device=mic_info["name"])
+                except Exception as e:
+                    logger.warning("AudioCapture: не удалось открыть микрофон", error=str(e))
+                    mic_stream = None
+            else:
+                logger.warning("AudioCapture: микрофон не найден, только loopback")
 
-                    # Стерео → моно
-                    if device_channels > 1:
-                        samples = (len(audio) // device_channels) * device_channels
-                        audio = audio[:samples].reshape(-1, device_channels).mean(axis=1).astype(np.int16)
+            while not self._stop_event.is_set():
+                # Loopback чанк
+                lb_raw = loopback_stream.read(lb_frames, exception_on_overflow=False)
+                lb_audio = _to_mono(_normalize(lb_raw, lb_channels), lb_channels)
+                if lb_rate != self._sample_rate:
+                    lb_audio = _resample(lb_audio, lb_rate, self._sample_rate)
 
-                    # Ресемплинг если частота устройства отличается от целевой
-                    if device_rate != self._sample_rate:
-                        audio = _resample(audio, device_rate, self._sample_rate)
+                # Микрофон чанк
+                if mic_stream:
+                    try:
+                        mic_raw = mic_stream.read(mic_frames, exception_on_overflow=False)
+                        mic_audio = _to_mono(_normalize(mic_raw, mic_channels), mic_channels)
+                        if mic_rate != self._sample_rate:
+                            mic_audio = _resample(mic_audio, mic_rate, self._sample_rate)
 
-                    if not self._queue.full():
-                        self._queue.put(audio)
-            finally:
-                stream.stop_stream()
-                stream.close()
+                        # Микшируем
+                        min_len = min(len(lb_audio), len(mic_audio))
+                        mixed = lb_audio[:min_len].astype(np.int32) + mic_audio[:min_len].astype(np.int32)
+                        audio = np.clip(mixed // 2, -32768, 32767).astype(np.int16)
+                    except Exception:
+                        audio = lb_audio
+                else:
+                    audio = lb_audio
+
+                if not self._queue.full():
+                    self._queue.put(audio)
+
         finally:
+            if loopback_stream:
+                loopback_stream.stop_stream()
+                loopback_stream.close()
+            if mic_stream:
+                mic_stream.stop_stream()
+                mic_stream.close()
             pa.terminate()
+
+    def _find_mic(self, pa) -> dict | None:
+        for i in range(pa.get_device_count()):
+            try:
+                info = pa.get_device_info_by_index(i)
+                if info["maxInputChannels"] > 0 and not info.get("isLoopbackDevice", False):
+                    return info
+            except Exception:
+                continue
+        return None
+
+
+def _normalize(raw: bytes, channels: int) -> np.ndarray:
+    return np.frombuffer(raw, dtype=np.int16)
+
+
+def _to_mono(audio: np.ndarray, channels: int) -> np.ndarray:
+    if channels > 1:
+        n = (len(audio) // channels) * channels
+        return audio[:n].reshape(-1, channels).mean(axis=1).astype(np.int16)
+    return audio
 
 
 def _resample(audio: np.ndarray, from_rate: int, to_rate: int) -> np.ndarray:
     import scipy.signal
-    resampled = scipy.signal.resample_poly(audio, to_rate, from_rate)
-    return resampled.astype(np.int16)
+    return scipy.signal.resample_poly(audio, to_rate, from_rate).astype(np.int16)
