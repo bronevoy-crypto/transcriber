@@ -166,7 +166,7 @@ def _find_mic(pa) -> dict | None:
     except Exception:
         pass
 
-    skip = ("sound mapper", "microsoft", "primary", "mapper", "stereo mix", "what u hear", "wave out")
+    skip = ("sound mapper", "microsoft", "primary", "mapper", "stereo mix", "стерео микшер", "what u hear", "wave out")
 
     wasapi_mic = None
     fallback_mic = None
