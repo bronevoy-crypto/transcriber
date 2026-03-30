@@ -1,11 +1,4 @@
-"""
-Локальная транскрибация на лету — этап 1 (без диаризации).
-
-Запуск:
-    python main.py
-
-Остановка: Ctrl+C
-"""
+"""Запуск: python main.py  |  Остановка: Ctrl+C"""
 import signal
 import time
 from pathlib import Path
@@ -84,7 +77,12 @@ def main() -> None:
                 continue
 
             now = time.monotonic() - meeting_start
-            is_speech = vad.is_speech(chunk)
+
+            try:
+                is_speech = vad.is_speech(chunk)
+            except Exception as e:
+                logger.warning("VAD ошибка, пропускаем чанк", error=str(e))
+                continue
 
             if is_speech:
                 if not speech_buffer:
@@ -95,32 +93,30 @@ def main() -> None:
                 # Принудительно нарезаем если сегмент > 30 сек
                 if len(speech_buffer) >= max_segment_chunks:
                     audio_segment = np.concatenate(speech_buffer)
-                    result = transcriber.transcribe(audio_segment)
-                    if result.text:
-                        writer.write_segment(start=segment_start, end=now, text=result.text)
-                        print(f"[{segment_start:.1f}s] {result.text}")
+                    try:
+                        result = transcriber.transcribe(audio_segment)
+                        if result.text:
+                            writer.write_segment(start=segment_start, end=now, text=result.text)
+                            print(f"[{segment_start:.1f}s] {result.text}")
+                    except Exception as e:
+                        logger.warning("Ошибка транскрибации", error=str(e))
+                    segment_start = now  # новый сегмент начинается с текущего момента
                     speech_buffer = []
                     silence_count = 0
-                    segment_start = now
             else:
                 if speech_buffer:
                     silence_count += 1
                     speech_buffer.append(chunk)  # немного тишины для контекста модели
 
                     if silence_count >= silence_threshold:
-                        # Транскрибируем накопленный сегмент
                         audio_segment = np.concatenate(speech_buffer)
-                        segment_end = now
-
-                        result = transcriber.transcribe(audio_segment)
-
-                        if result.text:
-                            writer.write_segment(
-                                start=segment_start,
-                                end=segment_end,
-                                text=result.text,
-                            )
-                            print(f"[{segment_start:.1f}s] {result.text}")
+                        try:
+                            result = transcriber.transcribe(audio_segment)
+                            if result.text:
+                                writer.write_segment(start=segment_start, end=now, text=result.text)
+                                print(f"[{segment_start:.1f}s] {result.text}")
+                        except Exception as e:
+                            logger.warning("Ошибка транскрибации", error=str(e))
 
                         speech_buffer = []
                         silence_count = 0

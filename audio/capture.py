@@ -11,10 +11,6 @@ _SAMPLE_RATE = 16000
 
 
 class AudioCapture:
-    """
-    Захват WASAPI loopback — системный звук ПК без VB-Cable.
-    VB-Cable нужен только если loopback устройство не найдено автоматически.
-    """
 
     def __init__(self, sample_rate: int = _SAMPLE_RATE, chunk_ms: int = 500):
         self._sample_rate = sample_rate
@@ -83,7 +79,8 @@ class AudioCapture:
 
                     # Стерео → моно
                     if device_channels > 1:
-                        audio = audio.reshape(-1, device_channels).mean(axis=1).astype(np.int16)
+                        samples = (len(audio) // device_channels) * device_channels
+                        audio = audio[:samples].reshape(-1, device_channels).mean(axis=1).astype(np.int16)
 
                     # Ресемплинг если частота устройства отличается от целевой
                     if device_rate != self._sample_rate:
