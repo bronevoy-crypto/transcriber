@@ -2,7 +2,7 @@
 Скачивание моделей GigaAM v3.
 
 Запуск:
-    python download_models.py          # CTC (рекомендуется для старта)
+    python download_models.py          # CTC
     python download_models.py --rnnt   # RNNT (точнее на ~1%, больше файлов)
     python download_models.py --all    # обе модели
 """

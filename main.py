@@ -89,7 +89,6 @@ def main() -> None:
                 speech_buffer.append(chunk)
                 silence_count = 0
 
-                # Принудительно нарезаем если сегмент > 30 сек
                 if len(speech_buffer) >= max_segment_chunks:
                     audio_segment = np.concatenate(speech_buffer)
                     try:
@@ -105,7 +104,7 @@ def main() -> None:
             else:
                 if speech_buffer:
                     silence_count += 1
-                    speech_buffer.append(chunk)  # немного тишины для контекста модели
+                    speech_buffer.append(chunk)
 
                     if silence_count >= silence_threshold:
                         audio_segment = np.concatenate(speech_buffer)
