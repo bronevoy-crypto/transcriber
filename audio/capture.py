@@ -133,10 +133,14 @@ class AudioCapture:
             pa.terminate()
 
     def _find_mic(self, pa) -> dict | None:
+        skip = ("sound mapper", "microsoft", "primary")
         for i in range(pa.get_device_count()):
             try:
                 info = pa.get_device_info_by_index(i)
-                if info["maxInputChannels"] > 0 and not info.get("isLoopbackDevice", False):
+                name_lower = info["name"].lower()
+                if (info["maxInputChannels"] > 0
+                        and not info.get("isLoopbackDevice", False)
+                        and not any(s in name_lower for s in skip)):
                     return info
             except Exception:
                 continue
