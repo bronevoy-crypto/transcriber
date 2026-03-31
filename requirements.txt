@@ -8,4 +8,6 @@ sherpa-onnx
 faster-whisper
 scipy
 huggingface_hub
-gigaam @ git+https://github.com/salute-developers/GigaAM.git
+hydra-core
+omegaconf
+sentencepiece
