@@ -24,6 +24,7 @@ cd transcriber
 **2. Установить зависимости**
 ```bash
 pip install -r requirements.txt
+pip install --no-deps git+https://github.com/salute-developers/GigaAM.git
 ```
 
 ## Запуск
