@@ -27,6 +27,7 @@ class GigaAME2ETranscriber(BaseTranscriber):
             revision=revision,
             trust_remote_code=True,
             low_cpu_mem_usage=False,
+            device_map=None,
         )
         self._model = wrapper.model
         logger.info("GigaAME2E: модель загружена")
