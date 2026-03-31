@@ -8,8 +8,4 @@ sherpa-onnx
 faster-whisper
 scipy
 huggingface_hub
-transformers
-hydra-core
-omegaconf
-sentencepiece
-pyannote-audio
+gigaam @ git+https://github.com/salute-developers/GigaAM.git
