@@ -11,3 +11,8 @@ models/
 
 # Torch hub кеш
 .cache/
+
+# Тестовые файлы
+test_*.py
+test_*.wav
+test_*.pcm
