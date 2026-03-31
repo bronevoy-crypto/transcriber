@@ -12,3 +12,4 @@ transformers
 hydra-core
 omegaconf
 sentencepiece
+pyannote-audio
