@@ -48,7 +48,7 @@ def main() -> None:
     writer.start_meeting()
 
     # Сколько тихих чанков подряд = конец сегмента
-    silence_threshold = int(silence_duration * 1000 / chunk_ms)
+    silence_threshold = max(1, int(silence_duration * 1000 / chunk_ms))
     max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
 
     speech_buffer: list[np.ndarray] = []
@@ -93,12 +93,12 @@ def main() -> None:
                     audio_segment = np.concatenate(speech_buffer)
                     try:
                         result = transcriber.transcribe(audio_segment)
-                        if result.text:
+                        if result.text and segment_start is not None:
                             writer.write_segment(start=segment_start, end=now, text=result.text)
                             print(f"[{segment_start:.1f}s] {result.text}")
                     except Exception as e:
                         logger.warning("Ошибка транскрибации", error=str(e))
-                    segment_start = now
+                    segment_start = None
                     speech_buffer = []
                     silence_count = 0
             else:
@@ -110,7 +110,7 @@ def main() -> None:
                         audio_segment = np.concatenate(speech_buffer)
                         try:
                             result = transcriber.transcribe(audio_segment)
-                            if result.text:
+                            if result.text and segment_start is not None:
                                 writer.write_segment(start=segment_start, end=now, text=result.text)
                                 print(f"[{segment_start:.1f}s] {result.text}")
                         except Exception as e:

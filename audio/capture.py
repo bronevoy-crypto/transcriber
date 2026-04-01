@@ -1,6 +1,7 @@
 """Захват системного звука и микрофона (Windows)."""
 import queue
 import threading
+import time
 
 import numpy as np
 import structlog
@@ -42,9 +43,10 @@ class AudioCapture:
 
         lb_buf: list[bytes] = []
         mic_buf: list[bytes] = []
+        buf_lock = threading.Lock()  # защищает pop в main loop от конкурентного append
 
         def lb_callback(in_data, frame_count, time_info, status):
-            lb_buf.append(in_data)
+            lb_buf.append(in_data)  # GIL делает append атомарным, lock здесь вызовет deadlock
             return (None, pyaudio.paContinue)
 
         pa = pyaudio.PyAudio()
@@ -99,7 +101,7 @@ class AudioCapture:
                         while not self._stop_event.is_set():
                             try:
                                 data = mic_stream.read(mic_frames, exception_on_overflow=False)
-                                mic_buf.append(data)
+                                mic_buf.append(data)  # GIL делает append атомарным
                             except Exception:
                                 break
 
@@ -119,20 +121,29 @@ class AudioCapture:
             while not self._stop_event.is_set():
                 pushed = False
 
-                if lb_buf:
-                    audio = _process(lb_buf.pop(0), lb_ch, lb_rate, self._sample_rate)
+                with buf_lock:
+                    lb_chunk = lb_buf.pop(0) if lb_buf else None
+                if lb_chunk is not None:
+                    audio = _process(lb_chunk, lb_ch, lb_rate, self._sample_rate)
                     if not self._queue.full():
                         self._queue.put(audio)
-                    pushed = True
+                        pushed = True
+                    else:
+                        logger.warning("AudioCapture: очередь переполнена, чанк потерян")
 
-                if mic_stream and mic_buf:
-                    audio = _process(mic_buf.pop(0), mic_ch, mic_rate, self._sample_rate)
-                    if not self._queue.full():
-                        self._queue.put(audio)
-                    pushed = True
+                if mic_stream:
+                    with buf_lock:
+                        mic_chunk = mic_buf.pop(0) if mic_buf else None
+                    if mic_chunk is not None:
+                        audio = _process(mic_chunk, mic_ch, mic_rate, self._sample_rate)
+                        if not self._queue.full():
+                            self._queue.put(audio)
+                            pushed = True
+                        else:
+                            logger.warning("AudioCapture: очередь переполнена, чанк потерян")
 
                 if not pushed:
-                    threading.Event().wait(0.01)
+                    time.sleep(0.01)
 
         finally:
             if lb_stream:
@@ -141,6 +152,8 @@ class AudioCapture:
             if mic_stream:
                 mic_stream.stop_stream()
                 mic_stream.close()
+            if mic_thread and mic_thread.is_alive():
+                mic_thread.join(timeout=2.0)
             pa.terminate()
 
 

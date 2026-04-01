@@ -8,6 +8,3 @@ sherpa-onnx
 faster-whisper
 scipy
 huggingface_hub
-hydra-core
-omegaconf
-sentencepiece

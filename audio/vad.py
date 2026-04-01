@@ -21,7 +21,7 @@ class VADProcessor:
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
             force_reload=False,
-            trust_repo=True,
+            trust_repo=False,
         )
         self._model.eval()
         logger.info("VADProcessor: модель загружена")
@@ -43,4 +43,4 @@ class VADProcessor:
                 speech_frames += 1
             total_frames += 1
 
-        return total_frames > 0 and (speech_frames / total_frames) > 0.3
+        return total_frames > 0 and (speech_frames / total_frames) >= self._threshold

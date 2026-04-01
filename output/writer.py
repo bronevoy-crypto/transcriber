@@ -34,7 +34,8 @@ class JSONWriter:
         }
         with self._lock:
             self._segments.append(segment)
-            self._flush()
+            if len(self._segments) % 3 == 0:
+                self._flush()
 
     def finish(self) -> str | None:
         with self._lock:
