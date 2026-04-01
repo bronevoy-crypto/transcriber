@@ -81,6 +81,9 @@ def main() -> None:
                 is_speech = vad.is_speech(chunk)
             except Exception as e:
                 logger.warning("VAD ошибка, пропускаем чанк", error=str(e))
+                speech_buffer = []
+                silence_count = 0
+                segment_start = None
                 continue
 
             if is_speech:
