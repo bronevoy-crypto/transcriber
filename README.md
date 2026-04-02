@@ -24,7 +24,7 @@ copy config.example.yaml config.yaml
 ## Настройка токена для диаризации
 
 1. Зарегистрироваться на [huggingface.co](https://huggingface.co)
-2. Принять условия использования (просто открыть и нажать Agree):
+2. Принять условия использования:
    - https://huggingface.co/pyannote/speaker-diarization-3.1
    - https://huggingface.co/pyannote/segmentation-3.0
 3. Создать токен: https://huggingface.co/settings/tokens → New token → Read
