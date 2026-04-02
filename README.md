@@ -23,8 +23,6 @@ copy config.example.yaml config.yaml
 
 ## Настройка токена для диаризации
 
-Диаризация — это разделение по спикерам (SPEAKER_00, SPEAKER_01...). Нужен токен HuggingFace.
-
 1. Зарегистрироваться на [huggingface.co](https://huggingface.co)
 2. Принять условия использования (просто открыть и нажать Agree):
    - https://huggingface.co/pyannote/speaker-diarization-3.1
