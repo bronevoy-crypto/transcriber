@@ -1,58 +1,45 @@
 # Meeting Transcriber
 
-Консольное приложение для локальной транскрибации совещаний. Захватывает системный звук и микрофон, нарезает по паузам, транскрибирует речь, определяет дикторов и сохраняет результат в JSON с таймкодами.
+Локальный транскрибер совещаний для Windows. Пишет системный звук + микрофон, режет по паузам, транскрибирует, определяет кто говорит. Результат — JSON с таймкодами и метками дикторов.
 
-Работает полностью офлайн — интернет нужен только при первом запуске для загрузки моделей.
+Всё работает на локальной машине, никуда не отправляется.
 
-## Что нужно
+## Требования
 
 - Windows 10/11
 - Python 3.10+
-- NVIDIA GPU (рекомендуется) — ускоряет транскрибацию и диаризацию. GigaAM e2e работает и на CPU.
-- Аккаунт на [huggingface.co](https://huggingface.co) — для диаризации (определения дикторов)
+- NVIDIA GPU — желательно, но не обязательно (GigaAM работает и на CPU)
+- Аккаунт на HuggingFace — нужен для диаризации
 
 ## Установка
 
-Открыть терминал (Win+R → ввести `cmd` → Enter) и выполнить по очереди:
-
-**1. Скачать проект**
 ```bash
 git clone https://github.com/HRYNdev/transcriber
 cd transcriber
-```
-
-**2. Установить зависимости**
-```bash
 pip install -r requirements.txt
 pip install --no-deps git+https://github.com/salute-developers/GigaAM.git
-```
-
-**3. Скопировать конфиг**
-```bash
 copy config.example.yaml config.yaml
 ```
 
-## Настройка диаризации (определение дикторов)
+## Настройка токена для диаризации
 
-Диаризация разделяет запись по участникам совещания (SPEAKER_00, SPEAKER_01 и т.д.).
+Диаризация — это разделение по спикерам (SPEAKER_00, SPEAKER_01...). Нужен токен HuggingFace.
 
-**Шаг 1.** Зарегистрироваться на [huggingface.co](https://huggingface.co)
+1. Зарегистрироваться на [huggingface.co](https://huggingface.co)
+2. Принять условия использования (просто открыть и нажать Agree):
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
+3. Создать токен: https://huggingface.co/settings/tokens → New token → Read
+4. Вставить в `config.yaml`:
 
-**Шаг 2.** Принять условия использования моделей — открыть каждую ссылку и нажать **Agree**:
-- [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-- [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
-
-**Шаг 3.** Создать токен: [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → New token → Role: Read
-
-**Шаг 4.** Вставить токен в `config.yaml`:
 ```yaml
 diarization:
   enabled: true
-  hf_token: "hf_ВАШ_ТОКЕН_ЗДЕСЬ"
-  device: "cuda"   # или "cpu" если нет GPU
+  hf_token: "hf_ВАШ_ТОКЕН"
+  device: "cuda"  # cpu если нет GPU
 ```
 
-Без токена диаризация не запустится. Чтобы отключить — поставить `enabled: false`.
+Если диаризация не нужна — `enabled: false`.
 
 ## Запуск
 
@@ -60,15 +47,13 @@ diarization:
 python main.py
 ```
 
-Запускать до начала встречи. Приложение захватывает системный звук и микрофон одновременно.
+Запускать до митинга. Остановить — Ctrl+C. После остановки автоматически запустится диаризация всей записи.
 
-Остановить — **Ctrl+C**. После остановки автоматически запустится диаризация полной записи (если включена).
+Результат в папке `meetings/`.
 
-Результат появится в папке `meetings/`.
+## Формат вывода
 
-## Как выглядит результат
-
-Файл называется по дате и времени: `2026-03-31_08-19-47.json`
+`meetings/2026-03-31_08-19-47.json`:
 
 ```json
 {
@@ -78,50 +63,37 @@ python main.py
       "start": 3.18,
       "end": 12.69,
       "speaker": "SPEAKER_00",
-      "text": "Добрый день, коллеги. Начинаем планирование спринта."
+      "text": "Добрый день, начинаем."
     },
     {
       "start": 13.75,
       "end": 28.40,
       "speaker": "SPEAKER_01",
-      "text": "Велосити за последние три спринта — в среднем 35 стори поинтов."
+      "text": "Велосити за спринт — 35 поинтов."
     }
   ]
 }
 ```
 
-## Настройки
+## Конфиг
 
-Все параметры в `config.yaml`. После изменений — перезапустить приложение.
-
-### Выбор модели транскрибации
+Основные параметры в `config.yaml`:
 
 ```yaml
 model:
-  type: "gigaam_e2e"   # gigaam_e2e, gigaam или whisper
-```
-
-| Модель | Описание |
-|--------|----------|
-| `gigaam_e2e` | GigaAM v3 e2e — рекомендуется. Высокая точность на русском, нормализует текст (числа цифрами, пунктуация). |
-| `gigaam` | GigaAM v3 CTC/RNNT — без нормализации текста. |
-| `whisper` | OpenAI Whisper large-v3 — требует NVIDIA GPU с 8+ GB VRAM. |
-
-### Чувствительность распознавания речи
-
-```yaml
-vad:
-  threshold: 0.5          # 0.1–0.9. Ниже = чувствительнее
+  type: "gigaam_e2e"  # gigaam_e2e / gigaam / whisper
 
 audio:
-  silence_duration: 2.5   # Секунд тишины для завершения сегмента
+  silence_duration: 2.5  # секунд тишины для конца сегмента
+
+vad:
+  threshold: 0.5  # чувствительность, 0.1–0.9
 ```
 
-### GPU / CPU
+Модели:
 
-```yaml
-diarization:
-  device: "cuda"   # "cuda" — GPU (быстрее), "cpu" — без GPU
-```
-
-Для транскрибации устройство выбирается автоматически по наличию GPU.
+| Тип | Описание |
+|-----|----------|
+| `gigaam_e2e` | GigaAM v3 — рекомендуется для русского. Числа цифрами, есть пунктуация. |
+| `gigaam` | GigaAM v3 без нормализации. |
+| `whisper` | Whisper large-v3. Нужна GPU с 8+ GB. |
