@@ -10,6 +10,7 @@ import yaml
 from audio.capture import AudioCapture
 from audio.vad import VADProcessor
 from transcribe.factory import create_transcriber
+from transcribe.diarizer import Diarizer
 from output.writer import JSONWriter
 
 logger = structlog.get_logger(__name__)
@@ -31,6 +32,7 @@ def main() -> None:
     vad_cfg = config.get("vad", {})
     model_cfg = config.get("model", {})
     output_cfg = config.get("output", {})
+    diar_cfg = config.get("diarization", {})
 
     sample_rate: int = audio_cfg.get("sample_rate", 16000)
     chunk_ms: int = audio_cfg.get("chunk_ms", 500)
@@ -43,6 +45,17 @@ def main() -> None:
         min_speech_ms=vad_cfg.get("min_speech_ms", 250),
     )
     transcriber = create_transcriber(model_cfg)
+
+    diarizer: Diarizer | None = None
+    if diar_cfg.get("enabled", False) and diar_cfg.get("hf_token", "").startswith("hf_"):
+        diarizer = Diarizer(
+            hf_token=diar_cfg["hf_token"],
+            device=diar_cfg.get("device", "cpu"),
+        )
+        diarizer.load()
+    else:
+        logger.info("Диаризация отключена или токен не задан")
+
     capture = AudioCapture(sample_rate=sample_rate, chunk_ms=chunk_ms)
     writer = JSONWriter(output_dir=output_cfg.get("dir", "meetings"))
     writer.start_meeting()
@@ -55,6 +68,8 @@ def main() -> None:
     silence_count = 0
     segment_start: float | None = None
     meeting_start = time.monotonic()
+    # Полный аудио-буфер для post-recording диаризации
+    full_audio_buffer: list[np.ndarray] = []
 
     stop = False
 
@@ -77,6 +92,8 @@ def main() -> None:
 
             now = time.monotonic() - meeting_start
 
+            full_audio_buffer.append(chunk)
+
             try:
                 is_speech = vad.is_speech(chunk)
             except Exception as e:
@@ -97,7 +114,8 @@ def main() -> None:
                     try:
                         result = transcriber.transcribe(audio_segment)
                         if result.text and segment_start is not None:
-                            writer.write_segment(start=segment_start, end=now, text=result.text)
+                            # Диктор будет назначен после записи через post-recording диаризацию
+                            writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?")
                             print(f"[{segment_start:.1f}s] {result.text}")
                     except Exception as e:
                         logger.warning("Ошибка транскрибации", error=str(e))
@@ -114,7 +132,7 @@ def main() -> None:
                         try:
                             result = transcriber.transcribe(audio_segment)
                             if result.text and segment_start is not None:
-                                writer.write_segment(start=segment_start, end=now, text=result.text)
+                                writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?")
                                 print(f"[{segment_start:.1f}s] {result.text}")
                         except Exception as e:
                             logger.warning("Ошибка транскрибации", error=str(e))
@@ -127,6 +145,25 @@ def main() -> None:
         output_path = writer.finish()
         if output_path:
             print(f"\nЗапись сохранена: {output_path}")
+
+        # Post-recording диаризация на полном аудио
+        if diarizer and full_audio_buffer and output_path:
+            print("Диаризация полного аудио...")
+            try:
+                full_audio = np.concatenate(full_audio_buffer)
+                timeline = diarizer.build_timeline(full_audio, sample_rate)
+                if timeline:
+                    # Обновляем JSON с правильными метками дикторов
+                    import json
+                    with open(output_path, encoding="utf-8") as f:
+                        data = json.load(f)
+                    for seg in data.get("segments", []):
+                        seg["speaker"] = diarizer.speaker_at(timeline, seg["start"], seg["end"])
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                    print(f"Диаризация завершена. Спикеры: {len(set(t['speaker'] for t in timeline))}")
+            except Exception as e:
+                logger.warning("Ошибка post-recording диаризации", error=str(e))
 
 
 if __name__ == "__main__":

@@ -12,7 +12,22 @@ models/
 # Torch hub кеш
 .cache/
 
-# Тестовые файлы
+# Тестовые файлы и бэнчмарки
 test_*.py
 test_*.wav
 test_*.pcm
+test_*.log
+bench_wer.py
+calc_wer.py
+tts_tests/
+bench_ref*.txt
+
+# Результаты тестов
+wer_*.json
+diar*.json
+
+# Логи
+*.log
+
+# Локальный конфиг с токенами — не пушить
+config.yaml
