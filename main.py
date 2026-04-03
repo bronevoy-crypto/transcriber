@@ -68,8 +68,10 @@ def main() -> None:
     silence_count = 0
     segment_start: float | None = None
     meeting_start = time.monotonic()
-    # Полный аудио-буфер для post-recording диаризации
-    full_audio_buffer: list[np.ndarray] = []
+    # Полный аудио-буфер для post-recording диаризации.
+    # Ключ — временной слот (индекс 500мс окна), значение — список чанков.
+    # Loopback и mic попадают в один слот и микшируются перед диаризацией.
+    _diar_slots: dict[int, list[np.ndarray]] = {}
 
     stop = False
 
@@ -92,7 +94,10 @@ def main() -> None:
 
             now = time.monotonic() - meeting_start
 
-            full_audio_buffer.append(chunk)
+            slot = int((time.monotonic() - meeting_start) * 1000 / chunk_ms)
+            if slot not in _diar_slots:
+                _diar_slots[slot] = []
+            _diar_slots[slot].append(chunk)
 
             try:
                 is_speech = vad.is_speech(chunk)
@@ -147,10 +152,22 @@ def main() -> None:
             print(f"\nЗапись сохранена: {output_path}")
 
         # Post-recording диаризация на полном аудио
-        if diarizer and full_audio_buffer and output_path:
+        if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...")
             try:
-                full_audio = np.concatenate(full_audio_buffer)
+                # Микшируем слоты: loopback + mic в одно аудио правильной длины
+                mixed_chunks = []
+                for slot in sorted(_diar_slots.keys()):
+                    chunks = _diar_slots[slot]
+                    if len(chunks) == 1:
+                        mixed_chunks.append(chunks[0])
+                    else:
+                        max_len = max(len(c) for c in chunks)
+                        mix = np.zeros(max_len, dtype=np.float32)
+                        for c in chunks:
+                            mix[:len(c)] += c.astype(np.float32)
+                        mixed_chunks.append(np.clip(mix, -32768, 32767).astype(np.int16))
+                full_audio = np.concatenate(mixed_chunks)
                 timeline = diarizer.build_timeline(full_audio, sample_rate)
                 if timeline:
                     # Обновляем JSON с правильными метками дикторов
