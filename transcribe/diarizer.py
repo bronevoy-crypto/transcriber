@@ -47,6 +47,62 @@ def _fix_pyannote_compat():
         pass
 
 
+def _fix_speechbrain_k2():
+    """Python 3.13 inspect.stack() вызывает hasattr(mod, '__file__') на всех модулях.
+
+    speechbrain регистрирует k2_fsa как LazyModule. При __file__ запросе LazyModule
+    пытается импортировать k2 — которого нет. Патчим сам класс LazyModule:
+    для служебных атрибутов inspect (__, __file__, __spec__ и т.п.) возвращаем None вместо ошибки.
+    Патчим ДО загрузки pipeline, чтобы покрыть все экземпляры.
+    """
+    try:
+        import speechbrain.utils.importutils as _sb_importutils
+        if not hasattr(_sb_importutils, "LazyModule"):
+            return
+        LazyModule = _sb_importutils.LazyModule
+        if getattr(LazyModule, "_k2_patched", False):
+            return
+        _orig_getattr = LazyModule.__getattr__
+
+        def _safe_getattr(self, attr):
+            # Атрибуты, которые inspect.py запрашивает на любом ModuleType-объекте.
+            # Если k2 не установлен — вернём None вместо ImportError.
+            if attr in ("__file__", "__spec__", "__loader__", "__package__", "__path__"):
+                try:
+                    return _orig_getattr(self, attr)
+                except (ImportError, AttributeError):
+                    return None
+            return _orig_getattr(self, attr)
+
+        LazyModule.__getattr__ = _safe_getattr
+        LazyModule._k2_patched = True
+    except Exception:
+        pass
+
+
+def _fix_windows_multiprocessing():
+    """На Windows после Ctrl+C возможны проблемы с multiprocessing в pyannote.
+
+    В pyannote 3.3.x Inference не использует DataLoader workers (нет num_workers),
+    поэтому патч не требуется. Функция оставлена для совместимости на случай
+    обновления pyannote до версии с num_workers.
+    """
+    try:
+        from pyannote.audio.core.inference import Inference
+        import inspect as _inspect
+        sig = _inspect.signature(Inference.__init__)
+        if "num_workers" not in sig.parameters:
+            return  # эта версия не использует workers — ничего не делаем
+        _orig_inference_init = Inference.__init__
+
+        def _patched_inference_init(self, model, *args, num_workers=0, **kwargs):
+            _orig_inference_init(self, model, *args, num_workers=num_workers, **kwargs)
+
+        Inference.__init__ = _patched_inference_init
+    except Exception:
+        pass
+
+
 def _fix_torchaudio_compat():
     """Monkey-patch для совместимости torchaudio 2.x с pyannote 3.x."""
     try:
@@ -113,6 +169,8 @@ class Diarizer:
         _fix_torch_load_compat()
         _fix_torchaudio_compat()
         _fix_pyannote_compat()
+        _fix_windows_multiprocessing()
+        _fix_speechbrain_k2()   # патчим LazyModule ДО загрузки pipeline
         from pyannote.audio import Pipeline
         logger.info("Diarizer: загрузка модели...")
         self._pipeline = Pipeline.from_pretrained(
