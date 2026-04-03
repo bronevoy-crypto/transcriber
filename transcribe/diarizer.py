@@ -202,6 +202,9 @@ class Diarizer:
         try:
             diarization = self._pipeline({"waveform": waveform, "sample_rate": sample_rate})
         except Exception as e:
+            import traceback
+            print(f"[Diarizer] ОШИБКА диаризации: {e}")
+            traceback.print_exc()
             logger.warning("Diarizer: ошибка диаризации", error=str(e))
             return []
 
