@@ -207,12 +207,13 @@ class Diarizer:
                 timeout=600,
             )
 
-            # Всегда печатаем stderr воркера — там прогресс и ошибки
-            if result.stderr:
-                print(result.stderr.decode("utf-8", errors="replace"), flush=True)
+            stderr_text = result.stderr.decode("utf-8", errors="replace")
+            stdout_text = result.stdout.decode("utf-8", errors="replace")
+            print(f"[Diarizer] returncode={result.returncode}", flush=True)
+            print(f"[Diarizer] stderr: {stderr_text[:2000] or '(пусто)'}", flush=True)
+            print(f"[Diarizer] stdout: {stdout_text[:500] or '(пусто)'}", flush=True)
 
             if result.returncode != 0:
-                print(f"[Diarizer] воркер упал с кодом {result.returncode}", flush=True)
                 logger.warning("Diarizer: воркер завершился с ошибкой", code=result.returncode)
                 return []
 
