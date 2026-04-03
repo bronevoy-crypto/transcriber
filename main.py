@@ -168,9 +168,7 @@ def main() -> None:
                             mix[:len(c)] += c.astype(np.float32)
                         mixed_chunks.append(np.clip(mix, -32768, 32767).astype(np.int16))
                 full_audio = np.concatenate(mixed_chunks)
-                print(f"[Диаризация] слотов={len(_diar_slots)}, аудио={len(full_audio)/sample_rate:.1f}s", flush=True)
                 timeline = diarizer.build_timeline(full_audio, sample_rate)
-                print(f"[Диаризация] интервалов={len(timeline)}", flush=True)
                 if timeline:
                     # Обновляем JSON с правильными метками дикторов
                     import json
