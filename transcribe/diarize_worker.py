@@ -18,11 +18,13 @@ if _project_root not in sys.path:
 
 
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: diarize_worker.py <wav_file> <hf_token> <device>", file=sys.stderr)
+    if len(sys.argv) not in (4, 6):
+        print("Usage: diarize_worker.py <wav_file> <hf_token> <device> [min_speakers max_speakers]", file=sys.stderr)
         sys.exit(1)
 
     wav_file, hf_token, device = sys.argv[1], sys.argv[2], sys.argv[3]
+    min_speakers = int(sys.argv[4]) if len(sys.argv) == 6 and sys.argv[4] != "none" else None
+    max_speakers = int(sys.argv[5]) if len(sys.argv) == 6 and sys.argv[5] != "none" else None
 
     # Загружаем аудио
     rate, audio = wavfile.read(wav_file)
@@ -59,10 +61,18 @@ def main():
         sys.exit(2)
 
     pipeline.to(torch.device(device))
-    print(f"[worker] pipeline загружен, диаризация {len(audio)/rate:.1f}s...", file=sys.stderr, flush=True)
+    spk_hint = ""
+    if min_speakers is not None or max_speakers is not None:
+        spk_hint = f" (min={min_speakers}, max={max_speakers})"
+    print(f"[worker] pipeline загружен, диаризация {len(audio)/rate:.1f}s{spk_hint}...", file=sys.stderr, flush=True)
 
     waveform = torch.from_numpy(audio.astype(np.float32) / 32768.0).unsqueeze(0)
-    diarization = pipeline({"waveform": waveform, "sample_rate": rate})
+    diar_kwargs = {}
+    if min_speakers is not None:
+        diar_kwargs["min_speakers"] = min_speakers
+    if max_speakers is not None:
+        diar_kwargs["max_speakers"] = max_speakers
+    diarization = pipeline({"waveform": waveform, "sample_rate": rate}, **diar_kwargs)
 
     speaker_map: dict[str, str] = {}
     next_id = 0

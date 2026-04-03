@@ -187,7 +187,13 @@ class Diarizer:
                 "https://huggingface.co/pyannote/speaker-diarization-3.1"
             ) from e
 
-    def build_timeline(self, audio: np.ndarray, sample_rate: int = 16000) -> list[dict]:
+    def build_timeline(
+        self,
+        audio: np.ndarray,
+        sample_rate: int = 16000,
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
+    ) -> list[dict]:
         """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
 
@@ -199,6 +205,11 @@ class Diarizer:
 
             worker = os.path.join(os.path.dirname(__file__), "diarize_worker.py")
             cmd = [sys.executable, worker, tmp.name, self._hf_token, str(self._device)]
+            if min_speakers is not None or max_speakers is not None:
+                cmd += [
+                    str(min_speakers) if min_speakers is not None else "none",
+                    str(max_speakers) if max_speakers is not None else "none",
+                ]
 
             result = subprocess.run(
                 cmd,

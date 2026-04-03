@@ -168,7 +168,11 @@ def main() -> None:
                             mix[:len(c)] += c.astype(np.float32)
                         mixed_chunks.append(np.clip(mix, -32768, 32767).astype(np.int16))
                 full_audio = np.concatenate(mixed_chunks)
-                timeline = diarizer.build_timeline(full_audio, sample_rate)
+                timeline = diarizer.build_timeline(
+                    full_audio, sample_rate,
+                    min_speakers=diar_cfg.get("min_speakers"),
+                    max_speakers=diar_cfg.get("max_speakers"),
+                )
                 if timeline:
                     # Обновляем JSON с правильными метками дикторов
                     import json
