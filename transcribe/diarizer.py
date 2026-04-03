@@ -177,6 +177,12 @@ class Diarizer:
             "pyannote/speaker-diarization-3.1",
             use_auth_token=self._hf_token,
         )
+        if self._pipeline is None:
+            raise RuntimeError(
+                "Не удалось загрузить pyannote/speaker-diarization-3.1. "
+                "Проверьте hf_token в config.yaml и примите условия использования на "
+                "https://huggingface.co/pyannote/speaker-diarization-3.1"
+            )
         self._pipeline.to(self._device)
         logger.info("Diarizer: модель загружена")
 
