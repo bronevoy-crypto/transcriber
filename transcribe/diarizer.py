@@ -201,10 +201,11 @@ class Diarizer:
         waveform = torch.from_numpy(audio.astype(np.float32) / 32768.0).unsqueeze(0).to(self._device)
         try:
             diarization = self._pipeline({"waveform": waveform, "sample_rate": sample_rate})
-        except Exception as e:
-            import traceback
-            print(f"[Diarizer] ОШИБКА диаризации: {e}")
+        except BaseException as e:
+            import traceback, sys
+            print(f"[Diarizer] ОШИБКА диаризации: {type(e).__name__}: {e}", flush=True)
             traceback.print_exc()
+            sys.stdout.flush()
             logger.warning("Diarizer: ошибка диаризации", error=str(e))
             return []
 

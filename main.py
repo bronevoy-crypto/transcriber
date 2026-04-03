@@ -162,10 +162,11 @@ def main() -> None:
                     with open(output_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     print(f"Диаризация завершена. Спикеры: {len(set(t['speaker'] for t in timeline))}")
-            except Exception as e:
-                import traceback
-                print(f"[Диаризация] ОШИБКА: {e}")
+            except BaseException as e:
+                import traceback, sys
+                print(f"[Диаризация] ОШИБКА: {type(e).__name__}: {e}", flush=True)
                 traceback.print_exc()
+                sys.stdout.flush()
                 logger.warning("Ошибка post-recording диаризации", error=str(e))
 
 
