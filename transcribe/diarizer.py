@@ -198,9 +198,12 @@ class Diarizer:
             return []
 
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
+        print("[Diarizer] шаг 1: конвертация аудио...", flush=True)
         waveform = torch.from_numpy(audio.astype(np.float32) / 32768.0).unsqueeze(0).to(self._device)
+        print(f"[Diarizer] шаг 2: запуск pipeline (waveform shape={waveform.shape})...", flush=True)
         try:
             diarization = self._pipeline({"waveform": waveform, "sample_rate": sample_rate})
+            print("[Diarizer] шаг 3: pipeline завершён", flush=True)
         except BaseException as e:
             import traceback, sys
             print(f"[Diarizer] ОШИБКА диаризации: {type(e).__name__}: {e}", flush=True)
