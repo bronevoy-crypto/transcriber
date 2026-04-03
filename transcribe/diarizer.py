@@ -202,12 +202,17 @@ class Diarizer:
 
             result = subprocess.run(
                 cmd,
-                capture_output=False,   # stderr виден в консоли напрямую
                 stdout=subprocess.PIPE,
-                timeout=600,            # 10 минут максимум
+                stderr=subprocess.PIPE,
+                timeout=600,
             )
 
+            # Всегда печатаем stderr воркера — там прогресс и ошибки
+            if result.stderr:
+                print(result.stderr.decode("utf-8", errors="replace"), flush=True)
+
             if result.returncode != 0:
+                print(f"[Diarizer] воркер упал с кодом {result.returncode}", flush=True)
                 logger.warning("Diarizer: воркер завершился с ошибкой", code=result.returncode)
                 return []
 
