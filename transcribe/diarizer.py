@@ -172,12 +172,7 @@ class Diarizer:
         self._next_id = 0
 
     def load(self) -> None:
-        """Проверка доступности токена и кешированных моделей.
-
-        Диаризация теперь запускается в subprocess (build_timeline),
-        поэтому загрузка pipeline в основной процесс не нужна.
-        Здесь только проверяем что токен валиден и модели скачаны.
-        """
+        """Проверка токена и доступности модели."""
         try:
             import huggingface_hub
             info = huggingface_hub.model_info(
@@ -193,11 +188,7 @@ class Diarizer:
             ) from e
 
     def build_timeline(self, audio: np.ndarray, sample_rate: int = 16000) -> list[dict]:
-        """Диаризировать ПОЛНОЕ аудио через subprocess и вернуть таймлайн.
-
-        Запускается в отдельном процессе — нативный краш в pyannote/torch
-        не убьёт основной процесс записи. Stderr воркера виден в консоли.
-        """
+        """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
 
         # Сохраняем аудио во временный WAV
