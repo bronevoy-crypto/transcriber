@@ -163,6 +163,9 @@ def main() -> None:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     print(f"Диаризация завершена. Спикеры: {len(set(t['speaker'] for t in timeline))}")
             except Exception as e:
+                import traceback
+                print(f"[Диаризация] ОШИБКА: {e}")
+                traceback.print_exc()
                 logger.warning("Ошибка post-recording диаризации", error=str(e))
 
 
