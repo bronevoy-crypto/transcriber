@@ -1,5 +1,11 @@
 """Диаризация говорящих через pyannote-audio."""
+import json
+import os
+import subprocess
+import sys
+import tempfile
 import numpy as np
+import scipy.io.wavfile as wavfile
 import structlog
 import torch
 
@@ -166,67 +172,81 @@ class Diarizer:
         self._next_id = 0
 
     def load(self) -> None:
-        _fix_torch_load_compat()
-        _fix_torchaudio_compat()
-        _fix_pyannote_compat()
-        _fix_windows_multiprocessing()
-        _fix_speechbrain_k2()   # патчим LazyModule ДО загрузки pipeline
-        from pyannote.audio import Pipeline
-        logger.info("Diarizer: загрузка модели...")
-        self._pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=self._hf_token,
-        )
-        if self._pipeline is None:
+        """Проверка доступности токена и кешированных моделей.
+
+        Диаризация теперь запускается в subprocess (build_timeline),
+        поэтому загрузка pipeline в основной процесс не нужна.
+        Здесь только проверяем что токен валиден и модели скачаны.
+        """
+        try:
+            import huggingface_hub
+            info = huggingface_hub.model_info(
+                "pyannote/speaker-diarization-3.1",
+                token=self._hf_token,
+            )
+            logger.info("Diarizer: токен валиден, модель доступна", model=info.id)
+        except Exception as e:
             raise RuntimeError(
-                "Не удалось загрузить pyannote/speaker-diarization-3.1. "
+                f"Не удалось получить доступ к pyannote/speaker-diarization-3.1: {e}\n"
                 "Проверьте hf_token в config.yaml и примите условия использования на "
                 "https://huggingface.co/pyannote/speaker-diarization-3.1"
-            )
-        self._pipeline.to(self._device)
-        logger.info("Diarizer: модель загружена")
+            ) from e
 
     def build_timeline(self, audio: np.ndarray, sample_rate: int = 16000) -> list[dict]:
-        """Диаризировать ПОЛНОЕ аудио и вернуть таймлайн со стабильными ID дикторов.
+        """Диаризировать ПОЛНОЕ аудио через subprocess и вернуть таймлайн.
 
-        Правильный подход: запускается один раз на всё аудио,
-        а не на каждый сегмент отдельно.
-
-        Возвращает список dict{start, end, speaker} с SPEAKER_00/01/...
+        Запускается в отдельном процессе — нативный краш в pyannote/torch
+        не убьёт основной процесс записи. Stderr воркера виден в консоли.
         """
-        if self._pipeline is None:
-            return []
-
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
-        print("[Diarizer] шаг 1: конвертация аудио...", flush=True)
-        waveform = torch.from_numpy(audio.astype(np.float32) / 32768.0).unsqueeze(0).to(self._device)
-        print(f"[Diarizer] шаг 2: запуск pipeline (waveform shape={waveform.shape})...", flush=True)
+
+        # Сохраняем аудио во временный WAV
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp.close()
         try:
-            diarization = self._pipeline({"waveform": waveform, "sample_rate": sample_rate})
-            print("[Diarizer] шаг 3: pipeline завершён", flush=True)
-        except BaseException as e:
-            import traceback, sys
-            print(f"[Diarizer] ОШИБКА диаризации: {type(e).__name__}: {e}", flush=True)
-            traceback.print_exc()
-            sys.stdout.flush()
-            logger.warning("Diarizer: ошибка диаризации", error=str(e))
+            wavfile.write(tmp.name, sample_rate, audio)
+
+            worker = os.path.join(os.path.dirname(__file__), "diarize_worker.py")
+            cmd = [sys.executable, worker, tmp.name, self._hf_token, str(self._device)]
+
+            result = subprocess.run(
+                cmd,
+                capture_output=False,   # stderr виден в консоли напрямую
+                stdout=subprocess.PIPE,
+                timeout=600,            # 10 минут максимум
+            )
+
+            if result.returncode != 0:
+                logger.warning("Diarizer: воркер завершился с ошибкой", code=result.returncode)
+                return []
+
+            # Парсим JSON из последней непустой строки stdout
+            lines = result.stdout.decode("utf-8", errors="replace").strip().splitlines()
+            for line in reversed(lines):
+                line = line.strip()
+                if line.startswith("["):
+                    try:
+                        timeline = json.loads(line)
+                        unique = len(set(t["speaker"] for t in timeline))
+                        logger.info("Diarizer: таймлайн готов", intervals=len(timeline), speakers=unique)
+                        return timeline
+                    except json.JSONDecodeError:
+                        continue
+
+            logger.warning("Diarizer: не удалось распарсить таймлайн из stdout")
             return []
 
-        timeline = []
-        for turn, _, speaker in diarization.itertracks(yield_label=True):
-            if speaker not in self._speaker_map:
-                self._speaker_map[speaker] = f"SPEAKER_{self._next_id:02d}"
-                self._next_id += 1
-                logger.info("Diarizer: новый спикер", id=self._speaker_map[speaker])
-            timeline.append({
-                "start": turn.start,
-                "end": turn.end,
-                "speaker": self._speaker_map[speaker],
-            })
-
-        unique = len(set(t["speaker"] for t in timeline))
-        logger.info("Diarizer: таймлайн готов", intervals=len(timeline), speakers=unique)
-        return timeline
+        except subprocess.TimeoutExpired:
+            logger.warning("Diarizer: таймаут диаризации (10 мин)")
+            return []
+        except Exception as e:
+            logger.warning("Diarizer: ошибка subprocess", error=str(e))
+            return []
+        finally:
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
 
     def speaker_at(self, timeline: list[dict], start: float, end: float) -> str:
         """Найти доминирующего диктора в заданном временном интервале по таймлайну."""
