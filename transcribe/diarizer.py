@@ -207,18 +207,14 @@ class Diarizer:
                 timeout=600,
             )
 
-            stderr_text = result.stderr.decode("utf-8", errors="replace")
-            stdout_text = result.stdout.decode("utf-8", errors="replace")
-            print(f"[Diarizer] returncode={result.returncode}", flush=True)
-            print(f"[Diarizer] stderr: {stderr_text[:2000] or '(пусто)'}", flush=True)
-            print(f"[Diarizer] stdout: {stdout_text[:500] or '(пусто)'}", flush=True)
-
             if result.returncode != 0:
+                err = result.stderr.decode(sys.stdout.encoding or "utf-8", errors="replace")
+                print(f"[Diarizer] воркер упал ({result.returncode}):\n{err}", flush=True)
                 logger.warning("Diarizer: воркер завершился с ошибкой", code=result.returncode)
                 return []
 
             # Парсим JSON из последней непустой строки stdout
-            lines = result.stdout.decode("utf-8", errors="replace").strip().splitlines()
+            lines = result.stdout.decode(sys.stdout.encoding or "utf-8", errors="replace").strip().splitlines()
             for line in reversed(lines):
                 line = line.strip()
                 if line.startswith("["):
