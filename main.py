@@ -160,7 +160,9 @@ def main() -> None:
             print("Диаризация полного аудио...", flush=True)
             try:
                 all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
+                print(f"[DBG] slots={len(all_chunks)} types={[type(c).__name__ for c in all_chunks[:3]]}", flush=True)
                 full_audio = np.concatenate(all_chunks).astype(np.int16)
+                print(f"[DBG] full_audio shape={full_audio.shape} dtype={full_audio.dtype}", flush=True)
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
                     min_speakers=diar_cfg.get("min_speakers"),
