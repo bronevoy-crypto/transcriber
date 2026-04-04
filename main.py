@@ -55,6 +55,7 @@ def main() -> None:
         diarizer.load()
     else:
         logger.info("Диаризация отключена или токен не задан")
+        print("Диаризация отключена (enabled: false или токен не задан)")
 
     capture = AudioCapture(sample_rate=sample_rate, chunk_ms=chunk_ms)
     writer = JSONWriter(output_dir=output_cfg.get("dir", "meetings"))
@@ -182,7 +183,10 @@ def main() -> None:
                         seg["speaker"] = diarizer.speaker_at(timeline, seg["start"], seg["end"])
                     with open(output_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
-                    print(f"Диаризация завершена. Спикеры: {len(set(t['speaker'] for t in timeline))}")
+                    speakers = len(set(t["speaker"] for t in timeline))
+                    print(f"Диаризация завершена. Найдено дикторов: {speakers}, интервалов: {len(timeline)}")
+                else:
+                    print("Диаризация: спикеры не найдены (запись слишком короткая или один голос). Метки не обновлены.")
             except BaseException as e:
                 import traceback, sys
                 print(f"[Диаризация] ОШИБКА: {type(e).__name__}: {e}", flush=True)
