@@ -263,10 +263,12 @@ class Diarizer:
             return []
 
         except subprocess.TimeoutExpired:
-            logger.warning("Diarizer: таймаут диаризации (10 мин)")
+            print("[Diarizer] таймаут диаризации (10 мин)", flush=True)
             return []
         except Exception as e:
-            logger.warning("Diarizer: ошибка subprocess", error=str(e))
+            import traceback
+            print(f"[Diarizer] ОШИБКА: {type(e).__name__}: {e}", flush=True)
+            traceback.print_exc()
             return []
         finally:
             try:
