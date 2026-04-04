@@ -148,7 +148,6 @@ def main() -> None:
                         segment_start = None
     finally:
         capture.stop()
-        time.sleep(1.0)  # give pyaudio time to fully release native resources before numpy ops
         output_path = writer.finish()
         if output_path:
             print(f"\nЗапись сохранена: {output_path}")
@@ -157,13 +156,10 @@ def main() -> None:
         if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...", flush=True)
             try:
-                print(f"[Diarizer] slots={len(_diar_slots)}", flush=True)
                 all_chunks = []
                 for slot in sorted(_diar_slots.keys()):
                     all_chunks.extend(_diar_slots[slot])
-                print(f"[Diarizer] chunks={len(all_chunks)}", flush=True)
                 full_audio = np.concatenate(all_chunks).astype(np.int16)
-                print(f"[Diarizer] audio={len(full_audio)/sample_rate:.1f}s", flush=True)
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
                     min_speakers=diar_cfg.get("min_speakers"),

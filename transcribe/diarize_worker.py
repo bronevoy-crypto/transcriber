@@ -8,8 +8,8 @@
 import sys
 import os
 import json
+import wave
 import numpy as np
-import scipy.io.wavfile as wavfile
 
 # Добавляем корень проекта в sys.path чтобы найти пакет transcribe
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,9 +30,10 @@ def main():
     max_speakers = int(sys.argv[5]) if len(sys.argv) == 6 and sys.argv[5] != "none" else None
 
     # Загружаем аудио
-    rate, audio = wavfile.read(wav_file)
-    if audio.dtype != np.int16:
-        audio = (audio * 32767).astype(np.int16)
+    with wave.open(wav_file, "rb") as wf:
+        rate = wf.getframerate()
+        raw = wf.readframes(wf.getnframes())
+    audio = np.frombuffer(raw, dtype=np.int16).copy()
 
     # Применяем все патчи совместимости
     from transcribe.diarizer import (

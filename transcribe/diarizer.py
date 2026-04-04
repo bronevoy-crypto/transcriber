@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 import numpy as np
-import scipy.io.wavfile as wavfile
+import wave
 import structlog
 import torch
 
@@ -195,14 +195,18 @@ class Diarizer:
         max_speakers: int | None = None,
     ) -> list[dict]:
         """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
-        print(f"[build_timeline] audio len={len(audio)} sr={sample_rate}", flush=True)
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
 
-        # Сохраняем аудио во временный WAV
+        # Сохраняем аудио во временный WAV (wave stdlib — не зависит от scipy)
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         tmp.close()
         try:
-            wavfile.write(tmp.name, sample_rate, audio)
+            audio_bytes = np.ascontiguousarray(audio, dtype=np.int16).tobytes()
+            with wave.open(tmp.name, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio_bytes)
 
             worker = os.path.join(os.path.dirname(__file__), "diarize_worker.py")
             cmd = [sys.executable, worker, tmp.name, self._hf_token, str(self._device)]
