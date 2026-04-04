@@ -70,9 +70,9 @@ def main() -> None:
     segment_start: float | None = None
     meeting_start = time.monotonic()
     # Полный аудио-буфер для post-recording диаризации.
-    # Ключ — временной слот (индекс 500мс окна), значение — список чанков.
-    # Loopback и mic попадают в один слот и микшируются перед диаризацией.
-    _diar_slots: dict[int, list[np.ndarray]] = {}
+    # Ключ — временной слот (индекс 500мс окна), значение — смикшированный float32 чанк.
+    # Loopback и mic попадают в один слот и усредняются (реальное микширование).
+    _diar_slots: dict[int, np.ndarray] = {}
 
     stop = False
 
@@ -96,9 +96,12 @@ def main() -> None:
             now = time.monotonic() - meeting_start
 
             slot = int((time.monotonic() - meeting_start) * 1000 / chunk_ms)
+            f = chunk.astype(np.float32)
             if slot not in _diar_slots:
-                _diar_slots[slot] = []
-            _diar_slots[slot].append(chunk)
+                _diar_slots[slot] = f
+            else:
+                n = min(len(_diar_slots[slot]), len(f))
+                _diar_slots[slot] = (_diar_slots[slot][:n] + f[:n]) / 2
 
             try:
                 is_speech = vad.is_speech(chunk)
@@ -156,9 +159,7 @@ def main() -> None:
         if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...", flush=True)
             try:
-                all_chunks = []
-                for slot in sorted(_diar_slots.keys()):
-                    all_chunks.extend(_diar_slots[slot])
+                all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
                 full_audio = np.concatenate(all_chunks).astype(np.int16)
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
