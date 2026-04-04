@@ -159,8 +159,11 @@ def main() -> None:
                 print(f"[Diarizer] миксуем аудио из {len(_diar_slots)} слотов...", flush=True)
                 # Микшируем слоты: loopback + mic в одно аудио правильной длины
                 mixed_chunks = []
-                for slot in sorted(_diar_slots.keys()):
+                slot_keys = sorted(_diar_slots.keys())
+                print(f"[Diarizer] sorted keys OK, первый={slot_keys[0]}, последний={slot_keys[-1]}", flush=True)
+                for i, slot in enumerate(slot_keys):
                     chunks = _diar_slots[slot]
+                    print(f"[Diarizer] слот {i}: {len(chunks)} чанков, dtype={chunks[0].dtype}, shape={chunks[0].shape}", flush=True)
                     if len(chunks) == 1:
                         mixed_chunks.append(chunks[0])
                     else:
@@ -169,6 +172,7 @@ def main() -> None:
                         for c in chunks:
                             mix[:len(c)] += c.astype(np.float32)
                         mixed_chunks.append(np.clip(mix, -32768, 32767).astype(np.int16))
+                print(f"[Diarizer] цикл завершён, {len(mixed_chunks)} чанков", flush=True)
                 full_audio = np.concatenate(mixed_chunks)
                 print(f"[Diarizer] аудио готово: {len(full_audio)/sample_rate:.1f}s, dtype={full_audio.dtype}", flush=True)
                 timeline = diarizer.build_timeline(
