@@ -211,17 +211,21 @@ class Diarizer:
                     str(max_speakers) if max_speakers is not None else "none",
                 ]
 
+            print(f"[Diarizer] запуск воркера...", flush=True)
             result = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=600,
             )
+            print(f"[Diarizer] воркер завершился, code={result.returncode}", flush=True)
 
             enc = sys.stdout.encoding or "utf-8"
             stderr_out = result.stderr.decode(enc, errors="replace")
             if stderr_out.strip():
                 print(stderr_out, flush=True)
+            else:
+                print("[Diarizer] воркер не вывел ничего в stderr", flush=True)
 
             if result.returncode != 0:
                 print(f"[Diarizer] воркер упал (code={result.returncode})", flush=True)
@@ -229,7 +233,9 @@ class Diarizer:
                 return []
 
             # Парсим JSON из последней непустой строки stdout
-            lines = result.stdout.decode(enc, errors="replace").strip().splitlines()
+            stdout_raw = result.stdout.decode(enc, errors="replace")
+            print(f"[Diarizer] stdout ({len(stdout_raw)} байт): {stdout_raw[:200]!r}", flush=True)
+            lines = stdout_raw.strip().splitlines()
             for line in reversed(lines):
                 line = line.strip()
                 if line.startswith("["):
@@ -241,7 +247,7 @@ class Diarizer:
                     except json.JSONDecodeError:
                         continue
 
-            logger.warning("Diarizer: не удалось распарсить таймлайн из stdout")
+            print("[Diarizer] не удалось распарсить таймлайн из stdout", flush=True)
             return []
 
         except subprocess.TimeoutExpired:
