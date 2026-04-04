@@ -196,7 +196,6 @@ class Diarizer:
     ) -> list[dict]:
         """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
         duration_s = len(audio) / sample_rate
-        print(f"[DIAR] build_timeline called, duration={duration_s:.1f}s", flush=True)
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(duration_s, 1))
         if duration_s < 1.0:
             logger.warning("Diarizer: аудио слишком короткое, пропускаем", duration_s=round(duration_s, 1))
