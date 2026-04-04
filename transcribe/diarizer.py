@@ -211,31 +211,43 @@ class Diarizer:
                     str(max_speakers) if max_speakers is not None else "none",
                 ]
 
-            print(f"[Diarizer] запуск воркера...", flush=True)
-            result = subprocess.run(
+            print("[Diarizer] запуск воркера (при первом запуске загрузка модели ~10 мин)...", flush=True)
+            enc = sys.stdout.encoding or "utf-8"
+            stdout_lines: list[str] = []
+
+            proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=600,
             )
-            print(f"[Diarizer] воркер завершился, code={result.returncode}", flush=True)
+            # Стримим stderr в реальном времени (прогресс загрузки модели)
+            import threading as _threading
+            def _stream_stderr():
+                for raw_line in proc.stderr:
+                    line = raw_line.decode(enc, errors="replace").rstrip()
+                    if line:
+                        print(line, flush=True)
+            stderr_thread = _threading.Thread(target=_stream_stderr, daemon=True)
+            stderr_thread.start()
 
-            enc = sys.stdout.encoding or "utf-8"
-            stderr_out = result.stderr.decode(enc, errors="replace")
-            if stderr_out.strip():
-                print(stderr_out, flush=True)
-            else:
-                print("[Diarizer] воркер не вывел ничего в stderr", flush=True)
+            try:
+                stdout_raw, _ = proc.communicate(timeout=600)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                logger.warning("Diarizer: таймаут диаризации (10 мин)")
+                return []
+            stderr_thread.join(timeout=5)
 
-            if result.returncode != 0:
-                print(f"[Diarizer] воркер упал (code={result.returncode})", flush=True)
-                logger.warning("Diarizer: воркер завершился с ошибкой", code=result.returncode)
+            returncode = proc.returncode
+            if returncode != 0:
+                print(f"[Diarizer] воркер упал (code={returncode})", flush=True)
+                logger.warning("Diarizer: воркер завершился с ошибкой", code=returncode)
                 return []
 
             # Парсим JSON из последней непустой строки stdout
-            stdout_raw = result.stdout.decode(enc, errors="replace")
-            print(f"[Diarizer] stdout ({len(stdout_raw)} байт): {stdout_raw[:200]!r}", flush=True)
-            lines = stdout_raw.strip().splitlines()
+            stdout_text = stdout_raw.decode(enc, errors="replace")
+            lines = stdout_text.strip().splitlines()
             for line in reversed(lines):
                 line = line.strip()
                 if line.startswith("["):
@@ -247,7 +259,7 @@ class Diarizer:
                     except json.JSONDecodeError:
                         continue
 
-            print("[Diarizer] не удалось распарсить таймлайн из stdout", flush=True)
+            logger.warning("Diarizer: не удалось распарсить таймлайн из stdout")
             return []
 
         except subprocess.TimeoutExpired:
