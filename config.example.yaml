@@ -1,7 +1,7 @@
 audio:
   sample_rate: 16000
   chunk_ms: 500          # размер чанка в мс
-  silence_duration: 2.5  # секунд тишины для завершения сегмента
+  silence_duration: 2.5  # пауза в секундах, после которой реплика считается завершённой
 
 vad:
   threshold: 0.5
