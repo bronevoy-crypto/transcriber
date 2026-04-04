@@ -96,12 +96,11 @@ def main() -> None:
             now = time.monotonic() - meeting_start
 
             slot = int((time.monotonic() - meeting_start) * 1000 / chunk_ms)
-            f = chunk.astype(np.float32)
             if slot not in _diar_slots:
-                _diar_slots[slot] = f
+                _diar_slots[slot] = chunk
             else:
-                n = min(len(_diar_slots[slot]), len(f))
-                _diar_slots[slot] = (_diar_slots[slot][:n] + f[:n]) / 2
+                n = min(len(_diar_slots[slot]), len(chunk))
+                _diar_slots[slot] = (((_diar_slots[slot][:n].astype(np.int32) + chunk[:n].astype(np.int32)) // 2).astype(np.int16))
 
             try:
                 is_speech = vad.is_speech(chunk)
@@ -151,6 +150,7 @@ def main() -> None:
                         segment_start = None
     finally:
         capture.stop()
+        time.sleep(1.0)  # дать PortAudio полностью завершиться до numpy операций
         output_path = writer.finish()
         if output_path:
             print(f"\nЗапись сохранена: {output_path}")
@@ -160,7 +160,10 @@ def main() -> None:
             print("Диаризация полного аудио...", flush=True)
             try:
                 all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
-                full_audio = np.concatenate(all_chunks).astype(np.int16)
+                # Храним int16 → просто склеиваем байты, никаких float-операций
+                audio_bytes = b"".join(c.tobytes() for c in all_chunks)
+                full_audio = np.frombuffer(audio_bytes, dtype=np.int16).copy()
+
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
                     min_speakers=diar_cfg.get("min_speakers"),

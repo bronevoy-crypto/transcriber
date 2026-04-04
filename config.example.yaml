@@ -29,6 +29,8 @@ diarization:
   enabled: true
   hf_token: "hf_REPLACE_WITH_YOUR_TOKEN"
   device: "cuda"
+  min_speakers: null   # null = авто, или задать число (например 1)
+  max_speakers: null   # null = авто, или задать число (например 4)
 
 output:
   dir: "meetings"
