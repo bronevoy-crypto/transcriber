@@ -148,6 +148,7 @@ def main() -> None:
                         segment_start = None
     finally:
         capture.stop()
+        time.sleep(1.0)  # give pyaudio time to fully release native resources before numpy ops
         output_path = writer.finish()
         if output_path:
             print(f"\nЗапись сохранена: {output_path}")
