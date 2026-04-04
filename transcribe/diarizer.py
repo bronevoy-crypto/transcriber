@@ -195,6 +195,7 @@ class Diarizer:
         max_speakers: int | None = None,
     ) -> list[dict]:
         """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
+        print(f"[build_timeline] audio len={len(audio)} sr={sample_rate}", flush=True)
         logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
 
         # Сохраняем аудио во временный WAV
