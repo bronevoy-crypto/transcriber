@@ -158,7 +158,7 @@ class AudioCapture:
 
 
 def _process(raw: bytes, channels: int, from_rate: int, to_rate: int) -> np.ndarray:
-    audio = np.frombuffer(raw, dtype=np.int16)
+    audio = np.frombuffer(raw, dtype=np.int16).copy()  # copy: pyaudio buffer freed on stream close
     if channels > 1:
         n = (len(audio) // channels) * channels
         audio = audio[:n].reshape(-1, channels).mean(axis=1).astype(np.int16)
