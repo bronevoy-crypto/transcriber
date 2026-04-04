@@ -18,11 +18,15 @@ class GigaAME2ETranscriber(BaseTranscriber):
         self._model = None
 
     def load(self) -> None:
+        import os
         import gigaam
+        from pathlib import Path
 
         name = f"v3_{self._variant}"
         logger.info("GigaAME2E: загрузка модели...", variant=name)
-        self._model = gigaam.load_model(name)
+        models_dir = Path(__file__).parent.parent / "models" / "gigaam"
+        models_dir.mkdir(parents=True, exist_ok=True)
+        self._model = gigaam.load_model(name, download_root=str(models_dir))
         logger.info("GigaAME2E: модель загружена")
 
     def is_loaded(self) -> bool:
