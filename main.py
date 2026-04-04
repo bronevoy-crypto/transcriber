@@ -63,7 +63,7 @@ def main() -> None:
 
     # Сколько тихих чанков подряд = конец сегмента
     silence_threshold = max(1, int(silence_duration * 1000 / chunk_ms))
-    max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
+    max_segment_chunks = int(audio_cfg.get("max_segment_ms", 15_000) / chunk_ms)  # принудительная нарезка
 
     speech_buffer: list[np.ndarray] = []
     silence_count = 0
@@ -154,8 +154,9 @@ def main() -> None:
 
         # Post-recording диаризация на полном аудио
         if diarizer and _diar_slots and output_path:
-            print("Диаризация полного аудио...")
+            print("Диаризация полного аудио...", flush=True)
             try:
+                print(f"[Diarizer] миксуем аудио из {len(_diar_slots)} слотов...", flush=True)
                 # Микшируем слоты: loopback + mic в одно аудио правильной длины
                 mixed_chunks = []
                 for slot in sorted(_diar_slots.keys()):
@@ -169,6 +170,7 @@ def main() -> None:
                             mix[:len(c)] += c.astype(np.float32)
                         mixed_chunks.append(np.clip(mix, -32768, 32767).astype(np.int16))
                 full_audio = np.concatenate(mixed_chunks)
+                print(f"[Diarizer] аудио готово: {len(full_audio)/sample_rate:.1f}s, dtype={full_audio.dtype}", flush=True)
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
                     min_speakers=diar_cfg.get("min_speakers"),
@@ -184,9 +186,9 @@ def main() -> None:
                     with open(output_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     speakers = len(set(t["speaker"] for t in timeline))
-                    print(f"Диаризация завершена. Найдено дикторов: {speakers}, интервалов: {len(timeline)}")
+                    print(f"Диаризация завершена. Найдено дикторов: {speakers}, интервалов: {len(timeline)}", flush=True)
                 else:
-                    print("Диаризация: спикеры не найдены (запись слишком короткая или один голос). Метки не обновлены.")
+                    print("Диаризация: спикеры не найдены (запись слишком короткая или один голос). Метки не обновлены.", flush=True)
             except BaseException as e:
                 import traceback, sys
                 print(f"[Диаризация] ОШИБКА: {type(e).__name__}: {e}", flush=True)
