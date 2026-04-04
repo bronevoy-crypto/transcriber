@@ -195,7 +195,11 @@ class Diarizer:
         max_speakers: int | None = None,
     ) -> list[dict]:
         """Диаризировать ПОЛНОЕ аудио, вернуть таймлайн со стабильными ID дикторов."""
-        logger.info("Diarizer: диаризация полного аудио", duration_s=round(len(audio) / sample_rate, 1))
+        duration_s = len(audio) / sample_rate
+        logger.info("Diarizer: диаризация полного аудио", duration_s=round(duration_s, 1))
+        if duration_s < 1.0:
+            logger.warning("Diarizer: аудио слишком короткое, пропускаем", duration_s=round(duration_s, 1))
+            return []
 
         # Сохраняем аудио во временный WAV (wave stdlib — не зависит от scipy)
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -217,23 +221,14 @@ class Diarizer:
                 ]
 
             print("[Diarizer] запуск воркера (при первом запуске загрузка модели ~10 мин)...", flush=True)
-            enc = sys.stdout.encoding or "utf-8"
-            stdout_lines: list[str] = []
 
+            # stderr=subprocess.STDOUT — мержим stderr в stdout, избегаем race condition
+            # при ручном потоке + communicate() на одном pipe
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
             )
-            # Стримим stderr в реальном времени (прогресс загрузки модели)
-            import threading as _threading
-            def _stream_stderr():
-                for raw_line in proc.stderr:
-                    line = raw_line.decode(enc, errors="replace").rstrip()
-                    if line:
-                        print(line, flush=True)
-            stderr_thread = _threading.Thread(target=_stream_stderr, daemon=True)
-            stderr_thread.start()
 
             try:
                 stdout_raw, _ = proc.communicate(timeout=600)
@@ -242,16 +237,20 @@ class Diarizer:
                 proc.communicate()
                 logger.warning("Diarizer: таймаут диаризации (10 мин)")
                 return []
-            stderr_thread.join(timeout=5)
 
-            returncode = proc.returncode
-            if returncode != 0:
-                print(f"[Diarizer] воркер упал (code={returncode})", flush=True)
-                logger.warning("Diarizer: воркер завершился с ошибкой", code=returncode)
+            enc = sys.stdout.encoding or "utf-8"
+            stdout_text = stdout_raw.decode(enc, errors="replace")
+
+            # Печатаем весь вывод воркера (прогресс + ошибки)
+            for line in stdout_text.splitlines():
+                if line.strip():
+                    print(line, flush=True)
+
+            if proc.returncode != 0:
+                logger.warning("Diarizer: воркер завершился с ошибкой", code=proc.returncode)
                 return []
 
             # Парсим JSON из последней непустой строки stdout
-            stdout_text = stdout_raw.decode(enc, errors="replace")
             lines = stdout_text.strip().splitlines()
             for line in reversed(lines):
                 line = line.strip()
@@ -267,9 +266,6 @@ class Diarizer:
             logger.warning("Diarizer: не удалось распарсить таймлайн из stdout")
             return []
 
-        except subprocess.TimeoutExpired:
-            print("[Diarizer] таймаут диаризации (10 мин)", flush=True)
-            return []
         except Exception as e:
             import traceback
             print(f"[Diarizer] ОШИБКА: {type(e).__name__}: {e}", flush=True)
