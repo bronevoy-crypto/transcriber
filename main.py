@@ -159,15 +159,11 @@ def main() -> None:
         if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...", flush=True)
             try:
+                print("[DBG1] building chunks", flush=True)
                 all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
+                print(f"[DBG2] chunks={len(all_chunks)}", flush=True)
                 full_audio = np.concatenate(all_chunks).astype(np.int16)
-                # Сохраняем аудио диаризации для проверки
-                import wave as _wave
-                _diar_wav = output_path.replace(".json", "_diar.wav")
-                with _wave.open(_diar_wav, "wb") as _wf:
-                    _wf.setnchannels(1); _wf.setsampwidth(2); _wf.setframerate(sample_rate)
-                    _wf.writeframes(full_audio.tobytes())
-                print(f"[DBG] diar audio saved: {_diar_wav} ({len(full_audio)/sample_rate:.1f}s, max={np.abs(full_audio).max()})", flush=True)
+                print(f"[DBG3] audio ok shape={full_audio.shape}", flush=True)
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
                     min_speakers=diar_cfg.get("min_speakers"),
@@ -188,7 +184,7 @@ def main() -> None:
                     print("Диаризация: спикеры не найдены (запись слишком короткая или один голос). Метки не обновлены.", flush=True)
             except BaseException as e:
                 import traceback, sys
-                print(f"[Диаризация] ОШИБКА: {type(e).__name__}: {e}", flush=True)
+                print(f"[DIAR ERROR] {type(e).__name__}: {e}".encode("ascii", "replace").decode(), flush=True)
                 traceback.print_exc()
                 sys.stdout.flush()
                 logger.warning("Ошибка post-recording диаризации", error=str(e))
