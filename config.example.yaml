@@ -8,7 +8,7 @@ vad:
   min_speech_ms: 250
 
 model:
-  type: "gigaam"      # "gigaam" (рекомендуется), "gigaam_e2e" или "whisper"
+  type: "gigaam_e2e"  # "gigaam_e2e", "gigaam" или "whisper"
   gigaam_e2e:
     variant: "e2e_ctc"  # "e2e_ctc" или "e2e_rnnt"
   gigaam:
