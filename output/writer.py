@@ -34,12 +34,12 @@ class JSONWriter:
         }
         with self._lock:
             self._segments.append(segment)
-            if len(self._segments) % 3 == 0:
-                self._flush()
+            should_flush = len(self._segments) % 3 == 0
+        if should_flush:
+            self._flush()
 
     def finish(self) -> str | None:
-        with self._lock:
-            self._flush()
+        self._flush()
         if self._filepath:
             logger.info("JSONWriter: встреча завершена", path=str(self._filepath), segments=len(self._segments))
             return str(self._filepath)
@@ -48,9 +48,11 @@ class JSONWriter:
     def _flush(self) -> None:
         if not self._filepath:
             return
+        with self._lock:
+            segments_snapshot = list(self._segments)
         data = {
             "meeting_date": self._meeting_start.isoformat() if self._meeting_start else None,
-            "segments": self._segments,
+            "segments": segments_snapshot,
         }
         self._filepath.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),

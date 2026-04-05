@@ -26,6 +26,10 @@ class VADProcessor:
         self._model.eval()
         logger.info("VADProcessor: модель загружена")
 
+    def reset(self) -> None:
+        if self._model is not None:
+            self._model.reset_states()
+
     def is_speech(self, audio: np.ndarray) -> bool:
         if len(audio) < self._min_speech_samples:
             return False
@@ -34,8 +38,10 @@ class VADProcessor:
         speech_frames = 0
         total_frames = 0
 
-        for i in range(0, len(audio) - frame_size + 1, frame_size):
+        for i in range(0, len(audio), frame_size):
             frame = audio[i:i + frame_size]
+            if len(frame) < frame_size:
+                frame = np.pad(frame, (0, frame_size - len(frame)))
             audio_float = torch.from_numpy(frame.astype(np.float32) / 32768.0)
             with torch.no_grad():
                 prob = self._model(audio_float, _SAMPLE_RATE).item()

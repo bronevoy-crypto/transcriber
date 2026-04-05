@@ -25,7 +25,7 @@ def load_config() -> dict:
         return yaml.safe_load(f)
 
 
-def main() -> None:
+def main(auto_stop_sec: float | None = None) -> None:
     config = load_config()
 
     audio_cfg = config.get("audio", {})
@@ -48,11 +48,17 @@ def main() -> None:
 
     diarizer: Diarizer | None = None
     if diar_cfg.get("enabled", False) and diar_cfg.get("hf_token", "").startswith("hf_"):
-        diarizer = Diarizer(
-            hf_token=diar_cfg["hf_token"],
-            device=diar_cfg.get("device", "cpu"),
-        )
-        diarizer.load()
+        try:
+            diarizer = Diarizer(
+                hf_token=diar_cfg["hf_token"],
+                device=diar_cfg.get("device", "cpu"),
+            )
+            diarizer.load()
+            print("Диаризация: инициализирована")
+        except Exception as e:
+            logger.warning("Диаризация: ошибка инициализации, продолжаем без неё", error=str(e))
+            print(f"Диаризация отключена (ошибка инициализации: {e})")
+            diarizer = None
     else:
         logger.info("Диаризация отключена или токен не задан")
         print("Диаризация отключена (enabled: false или токен не задан)")
@@ -61,17 +67,14 @@ def main() -> None:
     writer = JSONWriter(output_dir=output_cfg.get("dir", "meetings"))
     writer.start_meeting()
 
-    # Сколько тихих чанков подряд = конец сегмента
-    silence_threshold = max(1, int(silence_duration * 1000 / chunk_ms))
+    import math
     max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
 
     speech_buffer: list[np.ndarray] = []
-    silence_count = 0
+    pending_silence: list[np.ndarray] = []
+    silence_start: float | None = None
     segment_start: float | None = None
     meeting_start = time.monotonic()
-    # Полный аудио-буфер для post-recording диаризации.
-    # Ключ — временной слот (индекс 500мс окна), значение — смикшированный float32 чанк.
-    # Loopback и mic попадают в один слот и усредняются (реальное микширование).
     _diar_slots: dict[int, np.ndarray] = {}
 
     stop = False
@@ -85,7 +88,14 @@ def main() -> None:
     signal.signal(signal.SIGTERM, handle_signal)
 
     print("Запись началась. Нажмите Ctrl+C для остановки.\n")
+    vad.reset()  # сбрасываем LSTM-состояние Silero VAD перед новой записью
     capture.start()
+
+    # Авто-остановка для тестирования (--duration N)
+    if auto_stop_sec:
+        import threading
+        threading.Timer(auto_stop_sec, lambda: handle_signal(None, None)).start()
+        print(f"[test] авто-остановка через {auto_stop_sec}s", flush=True)
 
     try:
         while not stop:
@@ -96,46 +106,53 @@ def main() -> None:
             now = time.monotonic() - meeting_start
 
             slot = int((time.monotonic() - meeting_start) * 1000 / chunk_ms)
+            chunk_f = chunk.astype(np.float32) / 32768.0
             if slot not in _diar_slots:
-                _diar_slots[slot] = chunk
+                _diar_slots[slot] = chunk_f
             else:
-                n = min(len(_diar_slots[slot]), len(chunk))
-                _diar_slots[slot] = (((_diar_slots[slot][:n].astype(np.int32) + chunk[:n].astype(np.int32)) // 2).astype(np.int16))
+                n = min(len(_diar_slots[slot]), len(chunk_f))
+                mixed = (_diar_slots[slot][:n] + chunk_f[:n]) * 0.5
+                _diar_slots[slot] = np.clip(mixed, -1.0, 1.0)
 
             try:
                 is_speech = vad.is_speech(chunk)
             except Exception as e:
                 logger.warning("VAD ошибка, пропускаем чанк", error=str(e))
                 speech_buffer = []
-                silence_count = 0
+                pending_silence = []
+                silence_start = None
                 segment_start = None
                 continue
 
             if is_speech:
+                if pending_silence:
+                    speech_buffer.extend(pending_silence)
+                    pending_silence = []
                 if not speech_buffer:
                     segment_start = now
                 speech_buffer.append(chunk)
-                silence_count = 0
+                silence_start = None
 
                 if len(speech_buffer) >= max_segment_chunks:
                     audio_segment = np.concatenate(speech_buffer)
                     try:
                         result = transcriber.transcribe(audio_segment)
                         if result.text and segment_start is not None:
-                            # Диктор будет назначен после записи через post-recording диаризацию
                             writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?")
                             print(f"[{segment_start:.1f}s] {result.text}")
                     except Exception as e:
                         logger.warning("Ошибка транскрибации", error=str(e))
                     segment_start = None
                     speech_buffer = []
-                    silence_count = 0
+                    pending_silence = []
+                    silence_start = None
             else:
                 if speech_buffer:
-                    silence_count += 1
-                    speech_buffer.append(chunk)
+                    if silence_start is None:
+                        silence_start = now
+                    pending_silence.append(chunk)
 
-                    if silence_count >= silence_threshold:
+                    if now - silence_start >= silence_duration:
                         audio_segment = np.concatenate(speech_buffer)
                         try:
                             result = transcriber.transcribe(audio_segment)
@@ -146,23 +163,57 @@ def main() -> None:
                             logger.warning("Ошибка транскрибации", error=str(e))
 
                         speech_buffer = []
-                        silence_count = 0
+                        pending_silence = []
+                        silence_start = None
                         segment_start = None
     finally:
-        capture.stop()
-        time.sleep(1.0)  # дать PortAudio полностью завершиться до numpy операций
+        signal.signal(signal.SIGINT, signal.SIG_IGN)   # игнорируем Ctrl+C во время пост-обработки
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+        # Сохраняем последний сегмент речи если запись оборвалась в середине
+        if speech_buffer and segment_start is not None:
+            _end_now = time.monotonic() - meeting_start
+            audio_segment = np.concatenate(speech_buffer)
+            try:
+                result = transcriber.transcribe(audio_segment)
+                if result.text:
+                    writer.write_segment(start=segment_start, end=_end_now, text=result.text, speaker="SPEAKER_?")
+                    print(f"[{segment_start:.1f}s] {result.text}")
+            except Exception as e:
+                logger.warning("Ошибка финальной транскрибации", error=str(e))
+
+        print("Остановка захвата...", flush=True)
+        try:
+            capture.stop()  # PortAudio завершается здесь (включает sleep 1.0s внутри)
+        except Exception as e:
+            print(f"[capture.stop] ошибка: {e}", flush=True)
+
+        print("Сохранение файла...", flush=True)
         output_path = writer.finish()
         if output_path:
-            print(f"\nЗапись сохранена: {output_path}")
+            print(f"\nЗапись сохранена: {output_path}", flush=True)
+
+        # Сохраняем raw loopback аудио для диагностики (если включено в конфиге)
+        if _diar_slots and output_cfg.get("save_debug_wav", False):
+            try:
+                import scipy.io.wavfile as wavfile
+                all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
+                full_audio_f = np.concatenate(all_chunks)
+                full_audio = (np.clip(full_audio_f, -1.0, 1.0) * 32767).astype(np.int16)
+                debug_wav = str(output_path).replace(".json", "_debug.wav") if output_path else "debug_loopback.wav"
+                wavfile.write(debug_wav, sample_rate, full_audio)
+                print(f"Debug WAV сохранён: {debug_wav}", flush=True)
+            except Exception as e:
+                print(f"[debug] Ошибка сохранения WAV: {e}", flush=True)
 
         # Post-recording диаризация на полном аудио
         if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...", flush=True)
             try:
                 all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
-                # Храним int16 → просто склеиваем байты, никаких float-операций
-                audio_bytes = b"".join(c.tobytes() for c in all_chunks)
-                full_audio = np.frombuffer(audio_bytes, dtype=np.int16).copy()
+                # Храним float32 → конкатенируем и конвертируем в int16 для WAV
+                full_audio_f = np.concatenate(all_chunks)
+                full_audio = (np.clip(full_audio_f, -1.0, 1.0) * 32767).astype(np.int16)
 
                 timeline = diarizer.build_timeline(
                     full_audio, sample_rate,
@@ -191,4 +242,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys as _sys
+    _duration = None
+    for _arg in _sys.argv[1:]:
+        if _arg.startswith("--duration="):
+            _duration = float(_arg.split("=")[1])
+    main(auto_stop_sec=_duration)

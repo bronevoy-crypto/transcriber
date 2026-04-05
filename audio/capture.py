@@ -16,9 +16,10 @@ class AudioCapture:
     def __init__(self, sample_rate: int = _SAMPLE_RATE, chunk_ms: int = 500):
         self._sample_rate = sample_rate
         self._chunk_ms = chunk_ms
-        self._queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=100)
+        self._queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=200)
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._pa = None
 
     def start(self) -> None:
         self._stop_event.clear()
@@ -29,7 +30,7 @@ class AudioCapture:
     def stop(self) -> None:
         self._stop_event.set()
         if self._thread:
-            self._thread.join(timeout=3.0)
+            self._thread.join(timeout=10.0)
         logger.info("AudioCapture: остановлен")
 
     def get_chunk(self, timeout: float = 1.0) -> np.ndarray | None:
@@ -118,53 +119,78 @@ class AudioCapture:
             if mic_thread:
                 mic_thread.start()
 
-            while not self._stop_event.is_set():
-                pushed = False
+            # Пушим 1 раз в chunk_ms: берём что накопилось в lb и mic буферах,
+            # миксируем в один чанк — VAD не видит чередования речь/тишина.
+            push_interval = self._chunk_ms / 1000.0
+            _last_push = time.monotonic()
 
+            while not self._stop_event.is_set():
+                # Ждём следующего интервала
+                elapsed = time.monotonic() - _last_push
+                if elapsed < push_interval * 0.9:
+                    time.sleep(0.005)
+                    continue
+
+                pushed = False
                 with buf_lock:
                     lb_chunk = lb_buf.pop(0) if lb_buf else None
-                if lb_chunk is not None:
-                    audio = _process(lb_chunk, lb_ch, lb_rate, self._sample_rate)
+                    mic_chunk = mic_buf.pop(0) if (mic_stream and mic_buf) else None
+
+                if lb_chunk is not None or mic_chunk is not None:
+                    lb_audio = _process(lb_chunk, lb_ch, lb_rate, self._sample_rate) if lb_chunk is not None else None
+                    mic_audio = _process(mic_chunk, mic_ch, mic_rate, self._sample_rate) if mic_chunk is not None else None
+
+                    if lb_audio is not None and mic_audio is not None:
+                        n = min(len(lb_audio), len(mic_audio))
+                        mixed = np.clip(
+                            (lb_audio[:n].astype(np.float32) + mic_audio[:n].astype(np.float32)) * 0.5,
+                            -32768, 32767,
+                        ).astype(np.int16)
+                        audio = mixed
+                    else:
+                        audio = lb_audio if lb_audio is not None else mic_audio
+
                     if not self._queue.full():
                         self._queue.put(audio)
                         pushed = True
                     else:
                         logger.warning("AudioCapture: очередь переполнена, чанк потерян")
 
-                if mic_stream:
-                    with buf_lock:
-                        mic_chunk = mic_buf.pop(0) if mic_buf else None
-                    if mic_chunk is not None:
-                        audio = _process(mic_chunk, mic_ch, mic_rate, self._sample_rate)
-                        if not self._queue.full():
-                            self._queue.put(audio)
-                            pushed = True
-                        else:
-                            logger.warning("AudioCapture: очередь переполнена, чанк потерян")
-
-                if not pushed:
-                    time.sleep(0.01)
+                _last_push = time.monotonic()
 
         finally:
-            if lb_stream:
-                lb_stream.stop_stream()
-                lb_stream.close()
-            if mic_stream:
-                mic_stream.stop_stream()
-                mic_stream.close()
             if mic_thread and mic_thread.is_alive():
                 mic_thread.join(timeout=2.0)
-            pa.terminate()
+            if mic_stream:
+                try:
+                    mic_stream.stop_stream()
+                    mic_stream.close()
+                except Exception:
+                    pass
+            if lb_stream:
+                try:
+                    lb_stream.stop_stream()
+                    lb_stream.close()
+                except Exception:
+                    pass
+            try:
+                pa.terminate()
+            except Exception:
+                pass
 
 
 def _process(raw: bytes, channels: int, from_rate: int, to_rate: int) -> np.ndarray:
     audio = np.frombuffer(raw, dtype=np.int16).copy()  # copy: pyaudio buffer freed on stream close
     if channels > 1:
         n = (len(audio) // channels) * channels
-        audio = audio[:n].reshape(-1, channels).mean(axis=1).astype(np.int16)
+        # mean возвращает float64 — clip обязателен чтобы избежать wraparound при astype
+        mixed = audio[:n].reshape(-1, channels).mean(axis=1)
+        audio = np.clip(mixed, -32768, 32767).astype(np.int16)
     if from_rate != to_rate:
         import scipy.signal
-        audio = scipy.signal.resample_poly(audio, to_rate, from_rate).astype(np.int16)
+        # resample_poly возвращает float64, значения могут выйти за [-32768, 32767]
+        resampled = scipy.signal.resample_poly(audio.astype(np.float32), to_rate, from_rate)
+        audio = np.clip(resampled, -32768, 32767).astype(np.int16)
     return audio
 
 

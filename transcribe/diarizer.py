@@ -172,20 +172,12 @@ class Diarizer:
         self._next_id = 0
 
     def load(self) -> None:
-        """Проверка токена и доступности модели."""
-        try:
-            import huggingface_hub
-            info = huggingface_hub.model_info(
-                "pyannote/speaker-diarization-3.1",
-                token=self._hf_token,
-            )
-            logger.info("Diarizer: токен валиден, модель доступна", model=info.id)
-        except Exception as e:
+        if not self._hf_token or not self._hf_token.startswith("hf_"):
             raise RuntimeError(
-                f"Не удалось получить доступ к pyannote/speaker-diarization-3.1: {e}\n"
-                "Проверьте hf_token в config.yaml и примите условия использования на "
-                "https://huggingface.co/pyannote/speaker-diarization-3.1"
-            ) from e
+                "hf_token не задан или некорректен. "
+                "Укажите токен HuggingFace в config.yaml (diarization.hf_token)."
+            )
+        logger.info("Diarizer: токен установлен, модель загрузится при первой диаризации")
 
     def build_timeline(
         self,
