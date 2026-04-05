@@ -14,14 +14,11 @@ from pathlib import Path
 _CDN = "https://cdn.chatwm.opensmodel.sberdevices.ru/GigaAM"
 
 
-def _download_file(url: str, dest: Path, min_size: int = 1024) -> None:
+def _download_file(url: str, dest: Path) -> None:
     import urllib.request
     from tqdm import tqdm
-    if dest.exists() and dest.stat().st_size >= min_size:
-        print(f"  уже скачан: {dest.name}")
-        return
     if dest.exists():
-        dest.unlink()  # удаляем битый файл
+        dest.unlink()
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"  скачивание {dest.name}...")
     with urllib.request.urlopen(url) as src, open(dest, "wb") as out:
