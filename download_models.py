@@ -11,21 +11,38 @@ import argparse
 from pathlib import Path
 
 
+_CDN = "https://cdn.chatwm.opensmodel.sberdevices.ru/GigaAM"
+
+
+def _download_file(url: str, dest: Path) -> None:
+    import urllib.request
+    from tqdm import tqdm
+    if dest.exists():
+        print(f"  уже скачан: {dest.name}")
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"  скачивание {dest.name}...")
+    with urllib.request.urlopen(url) as src, open(dest, "wb") as out:
+        total = int(src.info().get("Content-Length", 0))
+        with tqdm(total=total, unit="iB", unit_scale=True, ncols=70) as bar:
+            while chunk := src.read(8192):
+                out.write(chunk)
+                bar.update(len(chunk))
+
+
 def download_e2e_ctc() -> None:
-    import gigaam
     models_dir = Path("models/gigaam")
-    models_dir.mkdir(parents=True, exist_ok=True)
     print("Скачивание GigaAM v3 e2e CTC...")
-    gigaam.load_model("v3_e2e_ctc", download_root=str(models_dir))
+    _download_file(f"{_CDN}/v3_e2e_ctc.ckpt", models_dir / "v3_e2e_ctc.ckpt")
+    _download_file(f"{_CDN}/v3_e2e_ctc_tokenizer.model", models_dir / "v3_e2e_ctc_tokenizer.model")
     print("GigaAM v3 e2e CTC скачана: models/gigaam/")
 
 
 def download_e2e_rnnt() -> None:
-    import gigaam
     models_dir = Path("models/gigaam")
-    models_dir.mkdir(parents=True, exist_ok=True)
     print("Скачивание GigaAM v3 e2e RNNT...")
-    gigaam.load_model("v3_e2e_rnnt", download_root=str(models_dir))
+    _download_file(f"{_CDN}/v3_e2e_rnnt.ckpt", models_dir / "v3_e2e_rnnt.ckpt")
+    _download_file(f"{_CDN}/v3_e2e_rnnt_tokenizer.model", models_dir / "v3_e2e_rnnt_tokenizer.model")
     print("GigaAM v3 e2e RNNT скачана: models/gigaam/")
 
 
