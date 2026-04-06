@@ -18,7 +18,8 @@ class GigaAME2ETranscriber(BaseTranscriber):
         self._model = None
 
     def load(self) -> None:
-        import os
+        import shutil
+        import tempfile
         import gigaam
         from pathlib import Path
 
@@ -26,7 +27,19 @@ class GigaAME2ETranscriber(BaseTranscriber):
         logger.info("GigaAME2E: загрузка модели...", variant=name)
         models_dir = Path(__file__).parent.parent / "models" / "gigaam"
         models_dir.mkdir(parents=True, exist_ok=True)
-        self._model = gigaam.load_model(name, download_root=str(models_dir))
+
+        # sentencepiece (C++) не открывает файлы с кириллицей в пути на Windows.
+        # Копируем модели во временную папку с ASCII-путём перед загрузкой.
+        try:
+            str(models_dir).encode("ascii")
+            load_dir = models_dir
+        except UnicodeEncodeError:
+            load_dir = Path(tempfile.gettempdir()) / "gigaam_models"
+            load_dir.mkdir(exist_ok=True)
+            for f in models_dir.iterdir():
+                shutil.copy2(f, load_dir / f.name)
+
+        self._model = gigaam.load_model(name, download_root=str(load_dir))
         logger.info("GigaAME2E: модель загружена")
 
     def is_loaded(self) -> bool:
