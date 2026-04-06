@@ -52,10 +52,13 @@ def main():
     if device == "cuda" and not torch.cuda.is_available():
         device = "cpu"
 
+    models_dir = os.path.join(_project_root, "models", "pyannote")
+    os.makedirs(models_dir, exist_ok=True)
     print(f"[worker] загрузка pipeline на {device}...", file=sys.stderr, flush=True)
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
         use_auth_token=hf_token,
+        cache_dir=models_dir,
     )
     if pipeline is None:
         print("[worker] pipeline is None — проверь токен HF", file=sys.stderr)

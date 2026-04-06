@@ -25,11 +25,15 @@ class WhisperTranscriber(BaseTranscriber):
         except ImportError:
             raise ImportError("Установите faster-whisper: pip install faster-whisper")
 
+        from pathlib import Path
+        models_dir = Path(__file__).parent.parent / "models" / "whisper"
+        models_dir.mkdir(parents=True, exist_ok=True)
         logger.info("WhisperTranscriber: загрузка модели...", model=self._model_name, device=self._device)
         self._model = WhisperModel(
             self._model_name,
             device=self._device,
             compute_type=self._compute_type,
+            download_root=str(models_dir),
         )
         logger.info("WhisperTranscriber: модель загружена")
 
