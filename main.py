@@ -227,12 +227,12 @@ def main(auto_stop_sec: float | None = None) -> None:
                     max_speakers=diar_cfg.get("max_speakers"),
                 )
                 if timeline:
-                    # Обновляем JSON с правильными метками дикторов
                     import json
                     with open(output_path, encoding="utf-8") as f:
                         data = json.load(f)
-                    for seg in data.get("segments", []):
-                        seg["speaker"] = diarizer.speaker_at(timeline, seg["start"], seg["end"])
+                    data["segments"] = diarizer.split_segments_by_speakers(
+                        data.get("segments", []), timeline
+                    )
                     with open(output_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     speakers = len(set(t["speaker"] for t in timeline))

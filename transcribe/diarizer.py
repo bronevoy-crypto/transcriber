@@ -282,6 +282,83 @@ class Diarizer:
             return "SPEAKER_00"
         return max(speaker_times, key=speaker_times.get)
 
+    def split_segments_by_speakers(
+        self, segments: list[dict], timeline: list[dict], min_turn: float = 1.0
+    ) -> list[dict]:
+        if not timeline:
+            return segments
+
+        result = []
+        for seg in segments:
+            seg_start, seg_end = seg["start"], seg["end"]
+            text = seg.get("text", "")
+
+            turns = []
+            for item in timeline:
+                o_start = max(item["start"], seg_start)
+                o_end = min(item["end"], seg_end)
+                if o_end > o_start:
+                    turns.append({"start": o_start, "end": o_end, "speaker": item["speaker"]})
+
+            # Фильтр: убираем короткие turn'ы — мержим в предыдущий
+            if len(turns) > 1:
+                merged = [turns[0]]
+                for t in turns[1:]:
+                    dur = t["end"] - t["start"]
+                    if dur < min_turn:
+                        merged[-1]["end"] = t["end"]
+                    elif t["speaker"] == merged[-1]["speaker"]:
+                        merged[-1]["end"] = t["end"]
+                    else:
+                        merged.append(t)
+                turns = merged
+
+            if len(turns) <= 1:
+                if turns:
+                    speaker = turns[0]["speaker"]
+                else:
+                    # Fallback: ближайший спикер по времени
+                    speaker = self.speaker_at(timeline, seg_start, seg_end)
+                result.append({**seg, "speaker": speaker})
+                continue
+
+            total_dur = sum(t["end"] - t["start"] for t in turns)
+            words = text.split()
+            if not words or total_dur <= 0:
+                result.append(seg)
+                continue
+
+            word_idx = 0
+            for i, turn in enumerate(turns):
+                turn_dur = turn["end"] - turn["start"]
+                if i == len(turns) - 1:
+                    turn_words = words[word_idx:]
+                else:
+                    n_words = max(1, round(len(words) * turn_dur / total_dur))
+                    turn_words = words[word_idx:word_idx + n_words]
+                    word_idx += n_words
+
+                if turn_words:
+                    result.append({
+                        "start": round(turn["start"], 2),
+                        "end": round(turn["end"], 2),
+                        "speaker": turn["speaker"],
+                        "text": " ".join(turn_words),
+                    })
+
+        # Merge соседних сегментов с одинаковым спикером
+        if len(result) > 1:
+            merged = [result[0]]
+            for seg in result[1:]:
+                if seg["speaker"] == merged[-1]["speaker"]:
+                    merged[-1]["end"] = seg["end"]
+                    merged[-1]["text"] += " " + seg["text"]
+                else:
+                    merged.append(seg)
+            result = merged
+
+        return result
+
     def diarize(self, audio: np.ndarray, sample_rate: int = 16000) -> str:
         """[УСТАРЕЛО] Определить доминирующего говорящего в одном сегменте.
 
