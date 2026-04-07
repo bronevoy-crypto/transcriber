@@ -65,7 +65,13 @@ def main(auto_stop_sec: float | None = None) -> None:
 
     capture = AudioCapture(sample_rate=sample_rate, chunk_ms=chunk_ms)
     writer = JSONWriter(output_dir=output_cfg.get("dir", "meetings"))
-    writer.start_meeting()
+    writer.start_meeting(config={
+        "model": model_cfg.get("type"),
+        "sample_rate": sample_rate,
+        "chunk_ms": chunk_ms,
+        "silence_duration": silence_duration,
+        "diarization": diar_cfg.get("enabled", False),
+    })
 
     import math
     max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек

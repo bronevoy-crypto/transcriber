@@ -17,9 +17,11 @@ class JSONWriter:
         self._segments: list[dict] = []
         self._lock = threading.Lock()
         self._meeting_start: datetime | None = None
+        self._config: dict | None = None
 
-    def start_meeting(self) -> None:
+    def start_meeting(self, config: dict | None = None) -> None:
         self._meeting_start = datetime.now()
+        self._config = config
         filename = self._meeting_start.strftime("%Y-%m-%d_%H-%M-%S") + ".json"
         self._filepath = self._output_dir / filename
         self._segments = []
@@ -52,6 +54,7 @@ class JSONWriter:
             segments_snapshot = list(self._segments)
         data = {
             "meeting_date": self._meeting_start.isoformat() if self._meeting_start else None,
+            "config": self._config,
             "segments": segments_snapshot,
         }
         self._filepath.write_text(
