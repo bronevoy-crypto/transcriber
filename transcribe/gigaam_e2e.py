@@ -50,9 +50,6 @@ class GigaAME2ETranscriber(BaseTranscriber):
             raise RuntimeError("GigaAME2E: модель не загружена")
 
         audio_float = audio.astype(np.float32) / 32768.0
-        peak = np.abs(audio_float).max()
-        if 0.01 < peak < 0.5:
-            audio_float = audio_float / peak * 0.9
         wav = torch.from_numpy(audio_float).to(self._model._device).to(self._model._dtype).unsqueeze(0)
         length = torch.tensor([wav.shape[-1]], device=self._model._device)
 

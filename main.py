@@ -80,7 +80,6 @@ def main(auto_stop_sec: float | None = None) -> None:
     pending_silence: list[np.ndarray] = []
     silence_start: float | None = None
     segment_start: float | None = None
-    _prev_chunk: np.ndarray | None = None
     meeting_start = time.monotonic()
     _diar_slots: dict[int, np.ndarray] = {}
 
@@ -137,10 +136,7 @@ def main(auto_stop_sec: float | None = None) -> None:
                     pending_silence = []
                 if not speech_buffer:
                     segment_start = now
-                    if _prev_chunk is not None:
-                        speech_buffer.append(_prev_chunk)
                 speech_buffer.append(chunk)
-                _prev_chunk = chunk
                 silence_start = None
 
                 if len(speech_buffer) >= max_segment_chunks:
@@ -157,15 +153,12 @@ def main(auto_stop_sec: float | None = None) -> None:
                     pending_silence = []
                     silence_start = None
             else:
-                _prev_chunk = chunk
                 if speech_buffer:
                     if silence_start is None:
                         silence_start = now
                     pending_silence.append(chunk)
 
                     if now - silence_start >= silence_duration:
-                        if pending_silence:
-                            speech_buffer.append(pending_silence[0])
                         audio_segment = np.concatenate(speech_buffer)
                         try:
                             result = transcriber.transcribe(audio_segment)
