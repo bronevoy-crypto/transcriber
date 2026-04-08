@@ -80,7 +80,7 @@ def main(auto_stop_sec: float | None = None) -> None:
     pending_silence: list[np.ndarray] = []
     silence_start: float | None = None
     segment_start: float | None = None
-    _prev_chunk: np.ndarray | None = None  # для leading audio
+    _prev_chunk: np.ndarray | None = None
     meeting_start = time.monotonic()
     _diar_slots: dict[int, np.ndarray] = {}
 
@@ -164,7 +164,6 @@ def main(auto_stop_sec: float | None = None) -> None:
                     pending_silence.append(chunk)
 
                     if now - silence_start >= silence_duration:
-                        # Добавляем первый тихий чанк — может содержать хвост речи
                         if pending_silence:
                             speech_buffer.append(pending_silence[0])
                         audio_segment = np.concatenate(speech_buffer)

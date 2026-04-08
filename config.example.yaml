@@ -4,7 +4,7 @@ audio:
   silence_duration: 0.2  # пауза в секундах, после которой реплика считается завершённой
 
 vad:
-  threshold: 0.5
+  threshold: 0.3
   min_speech_ms: 250
 
 model:

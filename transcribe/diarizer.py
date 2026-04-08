@@ -300,7 +300,6 @@ class Diarizer:
                 if o_end > o_start:
                     turns.append({"start": o_start, "end": o_end, "speaker": item["speaker"]})
 
-            # Фильтр: убираем короткие turn'ы — мержим в предыдущий
             if len(turns) > 1:
                 merged = [turns[0]]
                 for t in turns[1:]:
@@ -317,7 +316,6 @@ class Diarizer:
                 if turns:
                     speaker = turns[0]["speaker"]
                 else:
-                    # Fallback: ближайший спикер по времени
                     speaker = self.speaker_at(timeline, seg_start, seg_end)
                 result.append({**seg, "speaker": speaker})
                 continue
@@ -346,7 +344,6 @@ class Diarizer:
                         "text": " ".join(turn_words),
                     })
 
-        # Merge соседних сегментов с одинаковым спикером
         if len(result) > 1:
             merged = [result[0]]
             for seg in result[1:]:
