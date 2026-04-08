@@ -3,16 +3,10 @@ __pycache__/
 *.pyo
 .env
 
-# Папка с записями встреч — у каждого своя
 meetings/
-
-# Модели — скачиваются через download_models.py
 models/
-
-# Torch hub кеш
 .cache/
 
-# Тестовые файлы и бэнчмарки
 test_*.py
 test_*.wav
 test_*.pcm
@@ -22,12 +16,9 @@ calc_wer.py
 tts_tests/
 bench_ref*.txt
 
-# Результаты тестов
 wer_*.json
 diar*.json
 
-# Логи
 *.log
 
-# Локальный конфиг с токенами — не пушить
 config.yaml
