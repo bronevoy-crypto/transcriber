@@ -97,7 +97,6 @@ def main(auto_stop_sec: float | None = None) -> None:
     vad.reset()  # сбрасываем LSTM-состояние Silero VAD перед новой записью
     capture.start()
 
-    # Авто-остановка для тестирования (--duration N)
     if auto_stop_sec:
         import threading
         threading.Timer(auto_stop_sec, lambda: handle_signal(None, None)).start()
@@ -176,7 +175,6 @@ def main(auto_stop_sec: float | None = None) -> None:
         signal.signal(signal.SIGINT, signal.SIG_IGN)   # игнорируем Ctrl+C во время пост-обработки
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
-        # Сохраняем последний сегмент речи если запись оборвалась в середине
         if speech_buffer and segment_start is not None:
             _end_now = time.monotonic() - meeting_start
             audio_segment = np.concatenate(speech_buffer)
@@ -199,7 +197,6 @@ def main(auto_stop_sec: float | None = None) -> None:
         if output_path:
             print(f"\nЗапись сохранена: {output_path}", flush=True)
 
-        # Сохраняем raw loopback аудио для диагностики (если включено в конфиге)
         if _diar_slots and output_cfg.get("save_debug_wav", False):
             try:
                 import scipy.io.wavfile as wavfile
@@ -212,12 +209,10 @@ def main(auto_stop_sec: float | None = None) -> None:
             except Exception as e:
                 print(f"[debug] Ошибка сохранения WAV: {e}", flush=True)
 
-        # Post-recording диаризация на полном аудио
         if diarizer and _diar_slots and output_path:
             print("Диаризация полного аудио...", flush=True)
             try:
                 all_chunks = [_diar_slots[s] for s in sorted(_diar_slots.keys())]
-                # Храним float32 → конкатенируем и конвертируем в int16 для WAV
                 full_audio_f = np.concatenate(all_chunks)
                 full_audio = (np.clip(full_audio_f, -1.0, 1.0) * 32767).astype(np.int16)
 

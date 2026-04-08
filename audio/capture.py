@@ -119,13 +119,10 @@ class AudioCapture:
             if mic_thread:
                 mic_thread.start()
 
-            # Пушим 1 раз в chunk_ms: берём что накопилось в lb и mic буферах,
-            # миксируем в один чанк — VAD не видит чередования речь/тишина.
             push_interval = self._chunk_ms / 1000.0
             _last_push = time.monotonic()
 
             while not self._stop_event.is_set():
-                # Ждём следующего интервала
                 elapsed = time.monotonic() - _last_push
                 if elapsed < push_interval * 0.9:
                     time.sleep(0.005)
@@ -183,12 +180,10 @@ def _process(raw: bytes, channels: int, from_rate: int, to_rate: int) -> np.ndar
     audio = np.frombuffer(raw, dtype=np.int16).copy()  # copy: pyaudio buffer freed on stream close
     if channels > 1:
         n = (len(audio) // channels) * channels
-        # mean возвращает float64 — clip обязателен чтобы избежать wraparound при astype
         mixed = audio[:n].reshape(-1, channels).mean(axis=1)
         audio = np.clip(mixed, -32768, 32767).astype(np.int16)
     if from_rate != to_rate:
         import scipy.signal
-        # resample_poly возвращает float64, значения могут выйти за [-32768, 32767]
         resampled = scipy.signal.resample_poly(audio.astype(np.float32), to_rate, from_rate)
         audio = np.clip(resampled, -32768, 32767).astype(np.int16)
     return audio

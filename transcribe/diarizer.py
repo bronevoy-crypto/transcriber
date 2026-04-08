@@ -162,7 +162,6 @@ def _fix_torchaudio_compat():
 class Diarizer:
     def __init__(self, hf_token: str, device: str = "cpu"):
         self._hf_token = hf_token
-        # Fallback to CPU if CUDA not available in this torch build
         if device == "cuda" and not torch.cuda.is_available():
             logger.warning("Diarizer: CUDA недоступна, используем CPU")
             device = "cpu"
@@ -193,7 +192,6 @@ class Diarizer:
             logger.warning("Diarizer: аудио слишком короткое, пропускаем", duration_s=round(duration_s, 1))
             return []
 
-        # Сохраняем аудио во временный WAV (wave stdlib — не зависит от scipy)
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         tmp.close()
         try:
@@ -214,8 +212,6 @@ class Diarizer:
 
             print("[Diarizer] запуск воркера (при первом запуске загрузка модели ~10 мин)...", flush=True)
 
-            # stderr=subprocess.STDOUT — мержим stderr в stdout, избегаем race condition
-            # при ручном потоке + communicate() на одном pipe
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -233,7 +229,6 @@ class Diarizer:
             enc = sys.stdout.encoding or "utf-8"
             stdout_text = stdout_raw.decode(enc, errors="replace")
 
-            # Печатаем весь вывод воркера (прогресс + ошибки)
             for line in stdout_text.splitlines():
                 if line.strip():
                     print(line, flush=True)
@@ -242,7 +237,6 @@ class Diarizer:
                 logger.warning("Diarizer: воркер завершился с ошибкой", code=proc.returncode)
                 return []
 
-            # Парсим JSON из последней непустой строки stdout
             lines = stdout_text.strip().splitlines()
             for line in reversed(lines):
                 line = line.strip()

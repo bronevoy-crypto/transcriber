@@ -28,8 +28,6 @@ class GigaAME2ETranscriber(BaseTranscriber):
         models_dir = Path(__file__).parent.parent / "models" / "gigaam"
         models_dir.mkdir(parents=True, exist_ok=True)
 
-        # sentencepiece (C++) не открывает файлы с кириллицей в пути на Windows.
-        # Копируем модели во временную папку с ASCII-путём перед загрузкой.
         try:
             str(models_dir).encode("ascii")
             load_dir = models_dir
