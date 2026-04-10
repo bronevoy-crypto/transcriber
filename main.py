@@ -143,7 +143,7 @@ def main(auto_stop_sec: float | None = None) -> None:
                     try:
                         result = transcriber.transcribe(audio_segment)
                         if result.text and segment_start is not None:
-                            writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?")
+                            writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?", words=result.words)
                             print(f"[{segment_start:.1f}s] {result.text}")
                     except Exception as e:
                         logger.warning("Ошибка транскрибации", error=str(e))
@@ -162,7 +162,7 @@ def main(auto_stop_sec: float | None = None) -> None:
                         try:
                             result = transcriber.transcribe(audio_segment)
                             if result.text and segment_start is not None:
-                                writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?")
+                                writer.write_segment(start=segment_start, end=now, text=result.text, speaker="SPEAKER_?", words=result.words)
                                 print(f"[{segment_start:.1f}s] {result.text}")
                         except Exception as e:
                             logger.warning("Ошибка транскрибации", error=str(e))
@@ -181,7 +181,7 @@ def main(auto_stop_sec: float | None = None) -> None:
             try:
                 result = transcriber.transcribe(audio_segment)
                 if result.text:
-                    writer.write_segment(start=segment_start, end=_end_now, text=result.text, speaker="SPEAKER_?")
+                    writer.write_segment(start=segment_start, end=_end_now, text=result.text, speaker="SPEAKER_?", words=result.words)
                     print(f"[{segment_start:.1f}s] {result.text}")
             except Exception as e:
                 logger.warning("Ошибка финальной транскрибации", error=str(e))
@@ -225,9 +225,12 @@ def main(auto_stop_sec: float | None = None) -> None:
                     import json
                     with open(output_path, encoding="utf-8") as f:
                         data = json.load(f)
-                    data["segments"] = diarizer.split_segments_by_speakers(
+                    data["segments"] = diarizer.assign_speakers_by_word(
                         data.get("segments", []), timeline
                     )
+                    # убираем words из финального JSON — не нужны клиенту
+                    for seg in data["segments"]:
+                        seg.pop("words", None)
                     with open(output_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, ensure_ascii=False, indent=2)
                     speakers = len(set(t["speaker"] for t in timeline))

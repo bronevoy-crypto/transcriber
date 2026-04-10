@@ -54,8 +54,11 @@ class GigaAME2ETranscriber(BaseTranscriber):
         t0 = time.monotonic()
         with torch.inference_mode():
             encoded, encoded_len = self._model.forward(wav, length)
-            text, _ = self._model._decode(encoded, encoded_len, int(length[0].item()), False)
+            text, gigaam_words = self._model._decode(encoded, encoded_len, int(length[0].item()), True)
 
         elapsed_ms = (time.monotonic() - t0) * 1000
         logger.debug("GigaAME2E: decoded", text=text[:60], latency_ms=round(elapsed_ms))
-        return TranscriptionResult(text=text.strip())
+
+        from transcribe.base import WordTimestamp
+        words = [WordTimestamp(text=w.text, start=w.start, end=w.end) for w in gigaam_words] if gigaam_words else None
+        return TranscriptionResult(text=text.strip(), words=words)

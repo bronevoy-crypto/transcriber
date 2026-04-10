@@ -27,13 +27,15 @@ class JSONWriter:
         self._segments = []
         logger.info("JSONWriter: файл встречи создан", path=str(self._filepath))
 
-    def write_segment(self, start: float, end: float, text: str, speaker: str = "SPEAKER_00") -> None:
+    def write_segment(self, start: float, end: float, text: str, speaker: str = "SPEAKER_00", words: list | None = None) -> None:
         segment = {
             "start": round(start, 2),
             "end": round(end, 2),
             "speaker": speaker,
             "text": text,
         }
+        if words:
+            segment["words"] = [{"text": w.text, "start": w.start, "end": w.end} for w in words]
         with self._lock:
             self._segments.append(segment)
             should_flush = len(self._segments) % 3 == 0
