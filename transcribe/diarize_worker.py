@@ -1,9 +1,13 @@
-"""Воркер диаризации — запускается как subprocess из diarizer.py.
+"""Воркер диаризации. Запускается как отдельный процесс из diarizer.py.
 
-Использование:
-    python -m transcribe.diarize_worker <wav_file> <hf_token> <device>
+Отдельный процесс нужен потому что pyannote тащит за собой torch, speechbrain,
+k2 и всю их кашу — на py3.13 это всё нестабильно падает при загрузке, а
+pyannote ещё и GPU память не всегда отпускает. Проще прибить процесс когда
+закончил, чем чинить их утечки.
 
-Выводит JSON-таймлайн в stdout. Ошибки — в stderr.
+Вызов: python -m transcribe.diarize_worker <wav> <token> <device> [min max]
+Результат — JSON с таймлайном одной строкой в stdout. Лог и ошибки в stderr.
+Родитель ждёт максимум 10 минут, потом kill.
 """
 import sys
 import os

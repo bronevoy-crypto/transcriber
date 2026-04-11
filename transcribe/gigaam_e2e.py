@@ -6,13 +6,17 @@ import structlog
 import torch
 
 from transcribe.base import BaseTranscriber, TranscriptionResult
+from transcribe.factory import register
 
 logger = structlog.get_logger(__name__)
 
 _SAMPLE_RATE = 16000
 
 
+@register("gigaam_e2e")
 class GigaAME2ETranscriber(BaseTranscriber):
+    supports_word_timestamps = True
+
     def __init__(self, config: dict):
         self._variant = config.get("variant", "e2e_ctc")
         self._model = None

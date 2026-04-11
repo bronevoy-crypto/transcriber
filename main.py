@@ -1,4 +1,5 @@
 """Запуск: python main.py  |  Остановка: Ctrl+C"""
+import os
 import signal
 import time
 from pathlib import Path
@@ -6,12 +7,15 @@ from pathlib import Path
 import numpy as np
 import structlog
 import yaml
+from dotenv import load_dotenv
 
 from audio.capture import AudioCapture
 from audio.vad import VADProcessor
 from transcribe.factory import create_transcriber
 from transcribe.diarizer import Diarizer
 from output.writer import JSONWriter
+
+load_dotenv()
 
 logger = structlog.get_logger(__name__)
 
@@ -46,11 +50,15 @@ def main(auto_stop_sec: float | None = None) -> None:
     )
     transcriber = create_transcriber(model_cfg)
 
+    # Токен HuggingFace: приоритет у переменной окружения (из .env),
+    # fallback на значение из config.yaml для обратной совместимости.
+    hf_token = os.environ.get("HF_TOKEN") or diar_cfg.get("hf_token", "")
+
     diarizer: Diarizer | None = None
-    if diar_cfg.get("enabled", False) and diar_cfg.get("hf_token", "").startswith("hf_"):
+    if diar_cfg.get("enabled", False) and hf_token.startswith("hf_"):
         try:
             diarizer = Diarizer(
-                hf_token=diar_cfg["hf_token"],
+                hf_token=hf_token,
                 device=diar_cfg.get("device", "cpu"),
             )
             diarizer.load()
@@ -76,6 +84,16 @@ def main(auto_stop_sec: float | None = None) -> None:
     import math
     max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
 
+    # speech_buffer копит активную речь, pending_silence — тишину ПОСЛЕ речи
+    # (короткую паузу не отдаём сразу, чтобы не обрезать хвост слова —
+    # склеим со следующим чанком если пауза меньше silence_duration).
+    # Когда тишина набежала на silence_duration — финализируем сегмент.
+    # max_segment_chunks режет монолог в 180с насильно, иначе VAD залипает.
+    #
+    # _diar_slots — параллельный буфер для пост-диаризации: pyannote
+    # работает на всём аудио разом в конце, ей нужен сплошной поток.
+    # Ключ — номер слота по chunk_ms от старта, два источника усредняем
+    # если пришли в один слот (loopback и mic могут опередить друг друга).
     speech_buffer: list[np.ndarray] = []
     pending_silence: list[np.ndarray] = []
     silence_start: float | None = None
@@ -225,10 +243,21 @@ def main(auto_stop_sec: float | None = None) -> None:
                     import json
                     with open(output_path, encoding="utf-8") as f:
                         data = json.load(f)
-                    data["segments"] = diarizer.assign_speakers_by_word(
-                        data.get("segments", []), timeline
-                    )
-                    # убираем words из финального JSON — не нужны клиенту
+
+                    # Если транскрибер даёт пословные тайминги — привязываем
+                    # спикера к каждому слову, это точнее на границах реплик.
+                    # Иначе — ставим одного доминирующего спикера на весь сегмент.
+                    if getattr(transcriber, "supports_word_timestamps", False):
+                        data["segments"] = diarizer.assign_speakers_by_word(
+                            data.get("segments", []), timeline
+                        )
+                    else:
+                        updated = []
+                        for seg in data.get("segments", []):
+                            spk = diarizer.speaker_at(timeline, seg["start"], seg["end"])
+                            updated.append({**seg, "speaker": spk})
+                        data["segments"] = updated
+
                     for seg in data["segments"]:
                         seg.pop("words", None)
                     with open(output_path, "w", encoding="utf-8") as f:

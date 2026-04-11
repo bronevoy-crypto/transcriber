@@ -7,13 +7,19 @@ import numpy as np
 import structlog
 
 from transcribe.base import BaseTranscriber, TranscriptionResult
+from transcribe.factory import register
 
 logger = structlog.get_logger(__name__)
 
 _SAMPLE_RATE = 16000
 
 
+@register("gigaam")
 class GigaAMTranscriber(BaseTranscriber):
+    # sherpa-onnx offline recognizer не возвращает пословные тайминги —
+    # для диаризации эта ветка падает в fallback по majority vote.
+    supports_word_timestamps = False
+
     def __init__(self, config: dict):
         self._config = config
         self._model_type = config.get("type", "ctc")

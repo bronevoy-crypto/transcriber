@@ -10,3 +10,4 @@ scipy
 huggingface_hub
 pyannote.audio>=3.3,<4.0
 soundfile
+python-dotenv

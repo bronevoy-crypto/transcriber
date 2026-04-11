@@ -18,6 +18,11 @@ bench_ref*.txt
 
 wer_*.json
 diar*.json
+loopback*.json
+full_suite*.json
+*_results.json
+_test_segments.json
+test2_*.json
 
 *.log
 

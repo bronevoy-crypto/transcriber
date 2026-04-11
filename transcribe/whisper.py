@@ -4,14 +4,18 @@ import time
 import numpy as np
 import structlog
 
-from transcribe.base import BaseTranscriber, TranscriptionResult
+from transcribe.base import BaseTranscriber, TranscriptionResult, WordTimestamp
+from transcribe.factory import register
 
 logger = structlog.get_logger(__name__)
 
 _SAMPLE_RATE = 16000
 
 
+@register("whisper")
 class WhisperTranscriber(BaseTranscriber):
+    supports_word_timestamps = True
+
     def __init__(self, config: dict):
         self._model_name = config.get("model", "large-v3")
         self._language = config.get("language", "ru")
@@ -51,10 +55,20 @@ class WhisperTranscriber(BaseTranscriber):
             audio_float,
             language=self._language,
             beam_size=5,
-            vad_filter=False,  # используем собственный VAD
+            vad_filter=False,
+            word_timestamps=True,
         )
-        text = " ".join(seg.text.strip() for seg in segments)
+
+        texts: list[str] = []
+        words: list[WordTimestamp] = []
+        for seg in segments:
+            texts.append(seg.text.strip())
+            if seg.words:
+                for w in seg.words:
+                    words.append(WordTimestamp(text=w.word.strip(), start=w.start, end=w.end))
+
+        text = " ".join(texts).strip()
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         logger.debug("WhisperTranscriber: decoded", text=text[:60], latency_ms=round(elapsed_ms))
-        return TranscriptionResult(text=text)
+        return TranscriptionResult(text=text, words=words or None)

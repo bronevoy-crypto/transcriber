@@ -8,7 +8,7 @@ vad:
   min_speech_ms: 250
 
 model:
-  type: "gigaam_e2e"  # "gigaam_e2e", "gigaam" или "whisper"
+  type: "gigaam_e2e"  # "gigaam_e2e" | "gigaam" | "whisper" | "parakeet" | "tone"
   gigaam_e2e:
     variant: "e2e_ctc"  # "e2e_ctc" или "e2e_rnnt"
   gigaam:
@@ -24,10 +24,18 @@ model:
     language: "ru"
     device: "cuda"
     compute_type: "float16"
+  parakeet:
+    encoder_path: "models/parakeet/encoder.int8.onnx"
+    decoder_path: "models/parakeet/decoder.int8.onnx"
+    joiner_path: "models/parakeet/joiner.int8.onnx"
+    tokens_path: "models/parakeet/tokens.txt"
+    num_threads: 2
+  tone:
+    num_threads: 2
 
 diarization:
   enabled: true
-  hf_token: "hf_REPLACE_WITH_YOUR_TOKEN"
+  # Токен HuggingFace берётся из переменной окружения HF_TOKEN (см. .env.example).
   device: "cuda"
   min_speakers: null   # null = авто, или задать число (например 1)
   max_speakers: null   # null = авто, или задать число (например 4)

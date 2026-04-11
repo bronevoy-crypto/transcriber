@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 import numpy as np
@@ -8,7 +8,7 @@ import numpy as np
 @dataclass
 class WordTimestamp:
     text: str
-    start: float  # секунды от начала сегмента
+    start: float
     end: float
 
 
@@ -20,6 +20,10 @@ class TranscriptionResult:
 
 
 class BaseTranscriber(ABC):
+    # Если модель отдаёт word-level timestamps — переопределить в подклассе.
+    # От этого флага зависит способ привязки спикеров в диаризации.
+    supports_word_timestamps: bool = False
+
     @abstractmethod
     def load(self) -> None: ...
 

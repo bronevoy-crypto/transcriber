@@ -12,6 +12,11 @@ _SAMPLE_RATE = 16000
 
 
 class AudioCapture:
+    # Пишем одновременно loopback (то что играет в колонках — собеседник
+    # в звонке) и микрофон (свой голос), мержим в один поток 16kHz моно.
+    # Буферы — обычные list'ы, а не Queue: PortAudio-колбэки дергают
+    # append, а он под GIL атомарен. Queue.put может залочиться на
+    # переполнении, в колбэке это смерть.
 
     def __init__(self, sample_rate: int = _SAMPLE_RATE, chunk_ms: int = 500):
         self._sample_rate = sample_rate
@@ -177,7 +182,9 @@ class AudioCapture:
 
 
 def _process(raw: bytes, channels: int, from_rate: int, to_rate: int) -> np.ndarray:
-    audio = np.frombuffer(raw, dtype=np.int16).copy()  # copy: pyaudio buffer freed on stream close
+    # .copy() обязателен — frombuffer держит указатель на буфер pyaudio,
+    # после закрытия стрима получим мусор в последних чанках.
+    audio = np.frombuffer(raw, dtype=np.int16).copy()
     if channels > 1:
         n = (len(audio) // channels) * channels
         mixed = audio[:n].reshape(-1, channels).mean(axis=1)
