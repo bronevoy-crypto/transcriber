@@ -24,7 +24,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <repo>
+git clone https://github.com/HRYNdev/transcriber.git
 cd transcriber
 pip install -r requirements.txt
 pip install --no-deps git+https://github.com/salute-developers/GigaAM.git
@@ -51,7 +51,7 @@ python main.py
 ## Установка
 
 ```bash
-git clone <repo>
+git clone https://github.com/HRYNdev/transcriber.git
 cd transcriber
 pip install -r requirements.txt
 
