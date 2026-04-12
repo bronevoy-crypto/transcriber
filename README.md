@@ -30,7 +30,11 @@ pip install -r requirements.txt
 pip install --no-deps git+https://github.com/salute-developers/GigaAM.git
 copy config.example.yaml config.yaml
 copy .env.example .env
-# вписать HF_TOKEN в .env
+```
+
+Открыть `.env` и вписать свой HF токен, затем:
+
+```bash
 python main.py
 ```
 
