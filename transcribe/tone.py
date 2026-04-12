@@ -43,6 +43,7 @@ class ToneTranscriber(BaseTranscriber):
                     "git+https://github.com/voicekit-team/T-one.git",
                 ])
                 subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-deps", "pyctcdecode"])
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "pygtrie"])
                 from tone import StreamingCTCPipeline, DecoderType
             except Exception:
                 raise ImportError(
