@@ -1,12 +1,15 @@
 """T-one (T-Tech / voicekit-team) — русский CTC для телефонии, 8 kHz CPU."""
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 import structlog
 
 from transcribe.base import BaseTranscriber, TranscriptionResult
 from transcribe.factory import register
+
+_MODELS_DIR = Path(__file__).parent.parent / "models" / "tone"
 
 logger = structlog.get_logger(__name__)
 
@@ -54,13 +57,23 @@ class ToneTranscriber(BaseTranscriber):
                     "Требуется git: https://git-scm.com/download/win"
                 )
 
-        logger.info("ToneTranscriber: загрузка модели с HuggingFace...")
-        # DecoderType.GREEDY не требует KenLM (бинарные биндинги не собираются
-        # на Windows без C++ toolchain). BEAM_SEARCH даёт WER чуть ниже, но
-        # зависит от kenlm — если он установлен, можно переключить в конфиге.
         decoder_name = (self._config.get("decoder") or "greedy").lower()
         decoder = DecoderType.BEAM_SEARCH if decoder_name == "beam_search" else DecoderType.GREEDY
-        self._pipeline = StreamingCTCPipeline.from_hugging_face(decoder_type=decoder)
+
+        # Скачиваем модель в models/tone/ если ещё нет
+        model_file = _MODELS_DIR / "model.onnx"
+        if not model_file.exists():
+            logger.info("ToneTranscriber: скачивание модели в models/tone/...")
+            from huggingface_hub import hf_hub_download
+            _MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            hf_hub_download(
+                repo_id="t-tech/T-one",
+                filename="model.onnx",
+                local_dir=str(_MODELS_DIR),
+            )
+
+        logger.info("ToneTranscriber: загрузка модели...", decoder=decoder.value)
+        self._pipeline = StreamingCTCPipeline.from_local(_MODELS_DIR, decoder_type=decoder)
         logger.info("ToneTranscriber: модель загружена", decoder=decoder.value)
 
     def is_loaded(self) -> bool:
