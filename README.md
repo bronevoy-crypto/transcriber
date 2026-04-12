@@ -1,6 +1,6 @@
 # Meeting Transcriber
 
-Локальный транскрибер совещаний для Windows. Пишет системный звук + микрофон, режет по паузам, транскрибирует, определяет кто говорит. Результат — JSON с таймкодами и метками дикторов.
+Локальный транскрибер совещаний для Windows. Пишет системный звук + микрофон, режет по паузам, транскрибирует, определяет кто говорит. Результат: JSON с таймкодами и метками дикторов.
 
 Всё работает на локальной машине, никуда не отправляется.
 
@@ -34,7 +34,7 @@ copy .env.example .env
 python main.py
 ```
 
-Говори, затем `Ctrl+C` → в `meetings/` появится JSON.
+Говори, затем `Ctrl+C` и в `meetings/` появится JSON.
 
 ---
 
@@ -42,8 +42,8 @@ python main.py
 
 - Windows 10/11
 - Python 3.10+
-- NVIDIA GPU — желательно, но не обязательно (GigaAM работает и на CPU)
-- Аккаунт на HuggingFace — нужен для диаризации
+- NVIDIA GPU (желательно, GigaAM работает и на CPU)
+- Аккаунт на HuggingFace (нужен для диаризации)
 - ~2 ГБ на диске под модели (GigaAM + pyannote)
 
 ---
@@ -79,16 +79,16 @@ python download_models.py
 2. Принять условия использования:
    - https://huggingface.co/pyannote/speaker-diarization-3.1
    - https://huggingface.co/pyannote/segmentation-3.0
-3. Создать токен: https://huggingface.co/settings/tokens → **New token** → **Read**.
+3. Создать токен: https://huggingface.co/settings/tokens -> **New token** -> **Read**.
 4. Вставить токен в `.env`:
 
 ```env
 HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Файл `.env` не коммитится в репозиторий (см. `.gitignore`). Для локальной разработки достаточно одного файла, для деплоя — переменная окружения того же имени.
+Файл `.env` не коммитится в репозиторий (см. `.gitignore`). Для локальной разработки достаточно одного файла, для деплоя используется переменная окружения того же имени.
 
-Если диаризация не нужна — в `config.yaml`:
+Если диаризация не нужна, в `config.yaml`:
 
 ```yaml
 diarization:
@@ -103,9 +103,9 @@ diarization:
 python main.py
 ```
 
-Запускать **до** митинга. Остановить — `Ctrl+C`. После остановки автоматически запустится диаризация всей записи (в отдельном процессе, см. [Архитектура](#архитектура)).
+Запускать **до** митинга. Остановить: `Ctrl+C`. После остановки автоматически запустится диаризация всей записи (в отдельном процессе, см. [Архитектура](#архитектура)).
 
-Результат — в папке `meetings/` (имя файла = дата+время старта).
+Результат в папке `meetings/` (имя файла = дата+время старта).
 
 ---
 
@@ -140,7 +140,7 @@ python main.py
 }
 ```
 
-`SPEAKER_00`, `SPEAKER_01`, ... — стабильные идентификаторы в рамках одной встречи. Для перевода в настоящие имена нужно дополнительное сопоставление (эта логика — вне транскрибера).
+`SPEAKER_00`, `SPEAKER_01`, ... — стабильные идентификаторы в рамках одной встречи. Для перевода в настоящие имена нужно дополнительное сопоставление (эта логика вне транскрибера).
 
 ---
 
@@ -163,7 +163,7 @@ model:
 
 \* Замеры ориентировочные, на реальных данных будут отличаться.
 
-Если модель не даёт пословных таймингов, диаризация определяет одного спикера на весь сегмент. С word-level — переключение спикера на каждом слове, точнее на границах реплик.
+Если модель не даёт пословных таймингов, диаризация определяет одного спикера на весь сегмент. С word-level возможно переключение спикера на каждом слове, точнее на границах реплик.
 
 ### Конфиг моделей
 
@@ -190,15 +190,7 @@ model:
     decoder: "greedy"        # или "beam_search" (требует kenlm)
 ```
 
-Скачать Parakeet (640 МБ, один раз):
-
-```bash
-mkdir models/parakeet && cd models/parakeet
-curl -LO https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
-tar -xf sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
-mv sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/* .
-rm -rf sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
-```
+Parakeet нужно скачать отдельно (~640 МБ): архив `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` со страницы [releases sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models), распаковать содержимое в `models/parakeet/`.
 
 T-one качает модель сам с HuggingFace при первом запуске (~300 МБ в `~/.cache/huggingface`).
 
@@ -216,19 +208,19 @@ T-one качает модель сам с HuggingFace при первом зап
           │  chunk_ms × int16 моно 16kHz
           ▼
 ┌───────────────────┐
-│   VADProcessor    │   Silero VAD — is_speech(chunk) → bool
+│   VADProcessor    │   Silero VAD: is_speech(chunk) -> bool
 │   (audio/vad)     │
 └─────────┬─────────┘
           │
           ▼
 ┌───────────────────┐
 │  State machine    │   speech_buffer / pending_silence / silence_start
-│  в main.py        │   Режет на сегменты когда пауза ≥ silence_duration
+│  в main.py        │   Режет на сегменты когда пауза >= silence_duration
 └─────────┬─────────┘
           │  audio_segment (np.int16)
           ▼
 ┌───────────────────┐
-│   Transcriber     │   BaseTranscriber → TranscriptionResult(text, words)
+│   Transcriber     │   BaseTranscriber -> TranscriptionResult(text, words)
 │  (transcribe/*)   │   Выбор модели через реестр в factory.py
 └─────────┬─────────┘
           │
@@ -238,21 +230,21 @@ T-one качает модель сам с HuggingFace при первом зап
 │  (output/writer)  │
 └─────────┬─────────┘
           │
-          │   ─── Ctrl+C → запись закончилась ───
+          │   --- Ctrl+C: запись закончилась ---
           │
           ▼
 ┌───────────────────┐
 │  Diarizer         │   Запускает pyannote в отдельном subprocess
 │ (transcribe/      │   (изоляция тяжёлого torch+pyannote от основного
-│  diarizer.py →    │   процесса, гарантированное освобождение памяти)
+│  diarizer.py ->   │   процесса, гарантированное освобождение памяти)
 │  diarize_worker)  │
 └─────────┬─────────┘
           │  timeline = [{start, end, speaker}]
           ▼
 ┌───────────────────┐
 │  assign_speakers  │   Пришивает спикеров к сегментам:
-│  _by_word   (или  │   — есть word-level → по каждому слову
-│   speaker_at)     │   — нет → доминирующий спикер на сегмент
+│  _by_word   (или  │   - есть word-level: по каждому слову
+│   speaker_at)     │   - нет: доминирующий спикер на сегмент
 └─────────┬─────────┘
           │
           ▼
@@ -262,15 +254,15 @@ T-one качает модель сам с HuggingFace при первом зап
 
 ### Несколько заметок по дизайну
 
-Диаризация идёт в отдельном subprocess — pyannote тащит за собой половину питона (torch, speechbrain, k2) и на py3.13 это всё любит падать при загрузке. Плюс GPU-память оно не всегда отпускает. Проще прибить процесс когда закончили, чем чинить их утечки. Сам вызов и таймаут — в [`transcribe/diarizer.py`](transcribe/diarizer.py), сам pyannote — в [`transcribe/diarize_worker.py`](transcribe/diarize_worker.py).
+Диаризация идёт в отдельном subprocess — pyannote тащит за собой половину питона (torch, speechbrain, k2) и на py3.13 это всё любит падать при загрузке. Плюс GPU-память оно не всегда отпускает. Проще прибить процесс когда закончили, чем чинить их утечки. Сам вызов и таймаут в [`transcribe/diarizer.py`](transcribe/diarizer.py), сам pyannote в [`transcribe/diarize_worker.py`](transcribe/diarize_worker.py).
 
-Loopback и микрофон мержатся **до** VAD, не после. Иначе пришлось бы гонять VAD на двух потоках, сшивать их по времени и разбираться кто говорил первым. Проще смешать чанки в один поток — а диаризация в конце всё равно разложит по спикерам.
+Loopback и микрофон мержатся **до** VAD, не после. Иначе пришлось бы гонять VAD на двух потоках, сшивать их по времени и разбираться кто говорил первым. Проще смешать чанки в один поток, а диаризация в конце всё равно разложит по спикерам.
 
 В [`audio/capture.py`](audio/capture.py) буферы — обычные list'ы, а не `queue.Queue`. PortAudio-колбэки дёргают `append`, а он под GIL атомарен. `Queue.put` при переполнении встаёт на блокировку, а залочить C-колбэк PortAudio — гарантированный deadlock всего пайплайна.
 
 В `main.py` есть насильственная нарезка монолога каждые 180 секунд (`max_segment_chunks`). Реплики без пауз дольше трёх минут подвешивают VAD и раздувают буфер — проще резать принудительно, потом диаризация всё равно соберёт обратно.
 
-Модели подключаются через реестр с декоратором `@register("name")`, смотри `transcribe/factory.py`. Чтобы добавить новую — кладёшь файл в `transcribe/`, пакет сам его подхватит при импорте (см. `transcribe/__init__.py`). Подробности и пример в разделе [Как добавить свою модель](#как-добавить-свою-модель).
+Модели подключаются через реестр с декоратором `@register("name")`, смотри `transcribe/factory.py`. Чтобы добавить новую: кладёшь файл в `transcribe/`, пакет сам его подхватит при импорте (см. `transcribe/__init__.py`). Подробности и пример в разделе [Как добавить свою модель](#как-добавить-свою-модель).
 
 ### Структура каталогов
 
@@ -378,13 +370,13 @@ model:
 ## Troubleshooting
 
 **`ModuleNotFoundError: No module named 'gigaam'`**
-GigaAM не ставится из PyPI — нужно отдельно: `pip install --no-deps git+https://github.com/salute-developers/GigaAM.git`.
+GigaAM не ставится из PyPI, нужно отдельно: `pip install --no-deps git+https://github.com/salute-developers/GigaAM.git`.
 
 **`FileNotFoundError: models/gigaam-v3/model.int8.onnx`**
 Модели не скачаны. Запустить `python download_models.py`.
 
 **`hf_token не задан`**
-Не создан `.env` или токен без префикса `hf_`. Скопировать `.env.example` → `.env` и вставить реальный токен.
+Не создан `.env` или токен без префикса `hf_`. Скопировать `.env.example` в `.env` и вставить реальный токен.
 
 **Диаризация падает с `AttributeError: module 'torchaudio' has no attribute 'info'`**
 Конфликт torchaudio 2.x и pyannote 3.x. Патчи совместимости в [`transcribe/diarizer.py`](transcribe/diarizer.py) должны это закрывать. Если не помогло — проверить что в subprocess-воркере загружается нужная версия.
@@ -393,10 +385,10 @@ GigaAM не ставится из PyPI — нужно отдельно: `pip ins
 Поставить `compute_type: "int8"` в секции whisper, либо переключить на `gigaam_e2e` (работает и на CPU).
 
 **Кириллица ломается в консоли Windows**
-`chcp 65001` перед запуском, либо запускать через Windows Terminal — там UTF-8 из коробки.
+`chcp 65001` перед запуском, либо запускать через Windows Terminal (там UTF-8 из коробки).
 
 **Диаризация отработала, но все сегменты `SPEAKER_00`**
-Запись слишком короткая или один голос. Диаризация требует ≥1 сек аудио с разными голосами. Также проверить что в конфиге `diarization.enabled: true`.
+Запись слишком короткая или один голос. Диаризация требует >=1 сек аудио с разными голосами. Также проверить что в конфиге `diarization.enabled: true`.
 
 **Реплика длиной несколько минут без точек**
-VAD не увидел паузы. Понизить `silence_duration` в `config.yaml` или увеличить `vad.threshold`. Либо включить принудительную нарезку (она уже есть в коде, 180 сек — см. `max_segment_chunks` в `main.py`).
+VAD не увидел паузы. Понизить `silence_duration` в `config.yaml` или увеличить `vad.threshold`. Либо включить принудительную нарезку (она уже есть в коде, 180 сек, см. `max_segment_chunks` в `main.py`).
