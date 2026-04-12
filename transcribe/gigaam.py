@@ -42,11 +42,9 @@ class GigaAMTranscriber(BaseTranscriber):
         tokens_path = self._config.get("tokens_path", "models/gigaam-v3/tokens.txt")
 
         if not Path(model_path).exists():
-            raise FileNotFoundError(
-                f"GigaAM CTC модель не найдена: {model_path}\n"
-                "Скачайте модель:\n"
-                "  python download_models.py --sherpa"
-            )
+            print("GigaAM: модель не найдена, скачиваю...")
+            from download_models import download_sherpa_ctc
+            download_sherpa_ctc()
 
         logger.info("GigaAMTranscriber: загрузка CTC...", model=model_path)
         self._recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_ctc(
@@ -65,11 +63,9 @@ class GigaAMTranscriber(BaseTranscriber):
         encoder = cfg.get("encoder_path", "models/gigaam-v3-rnnt/encoder.int8.onnx")
 
         if not Path(encoder).exists():
-            raise FileNotFoundError(
-                f"GigaAM RNNT модель не найдена: {encoder}\n"
-                "Скачайте модель:\n"
-                "  python download_models.py --sherpa --rnnt"
-            )
+            print("GigaAM: RNNT модель не найдена, скачиваю...")
+            from download_models import download_sherpa_rnnt
+            download_sherpa_rnnt()
 
         logger.info("GigaAMTranscriber: загрузка RNNT...", encoder=encoder)
         self._recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_transducer(
