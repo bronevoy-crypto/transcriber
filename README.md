@@ -67,12 +67,6 @@ copy config.example.yaml config.yaml
 copy .env.example .env
 ```
 
-Скачать модели GigaAM (одноразово):
-
-```bash
-python download_models.py
-```
-
 ---
 
 ## Настройка .env и диаризации
