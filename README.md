@@ -208,19 +208,19 @@ T-one качает модель сам с HuggingFace при первом зап
           │  chunk_ms × int16 моно 16kHz
           ▼
 ┌───────────────────┐
-│   VADProcessor    │   Silero VAD: is_speech(chunk) -> bool
+│   VADProcessor    │   Silero VAD — is_speech(chunk) → bool
 │   (audio/vad)     │
 └─────────┬─────────┘
           │
           ▼
 ┌───────────────────┐
 │  State machine    │   speech_buffer / pending_silence / silence_start
-│  в main.py        │   Режет на сегменты когда пауза >= silence_duration
+│  в main.py        │   Режет на сегменты когда пауза ≥ silence_duration
 └─────────┬─────────┘
           │  audio_segment (np.int16)
           ▼
 ┌───────────────────┐
-│   Transcriber     │   BaseTranscriber -> TranscriptionResult(text, words)
+│   Transcriber     │   BaseTranscriber → TranscriptionResult(text, words)
 │  (transcribe/*)   │   Выбор модели через реестр в factory.py
 └─────────┬─────────┘
           │
@@ -230,21 +230,21 @@ T-one качает модель сам с HuggingFace при первом зап
 │  (output/writer)  │
 └─────────┬─────────┘
           │
-          │   --- Ctrl+C: запись закончилась ---
+          │   ─── Ctrl+C → запись закончилась ───
           │
           ▼
 ┌───────────────────┐
 │  Diarizer         │   Запускает pyannote в отдельном subprocess
 │ (transcribe/      │   (изоляция тяжёлого torch+pyannote от основного
-│  diarizer.py ->   │   процесса, гарантированное освобождение памяти)
+│  diarizer.py →    │   процесса, гарантированное освобождение памяти)
 │  diarize_worker)  │
 └─────────┬─────────┘
           │  timeline = [{start, end, speaker}]
           ▼
 ┌───────────────────┐
 │  assign_speakers  │   Пришивает спикеров к сегментам:
-│  _by_word   (или  │   - есть word-level: по каждому слову
-│   speaker_at)     │   - нет: доминирующий спикер на сегмент
+│  _by_word   (или  │   — есть word-level → по каждому слову
+│   speaker_at)     │   — нет → доминирующий спикер на сегмент
 └─────────┬─────────┘
           │
           ▼
