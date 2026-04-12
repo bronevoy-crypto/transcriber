@@ -59,14 +59,10 @@ class ParakeetTranscriber(BaseTranscriber):
         except ImportError:
             raise ImportError("Установите sherpa-onnx: pip install sherpa-onnx")
 
-        for path in (self._encoder, self._decoder, self._joiner, self._tokens):
-            if not Path(path).exists():
-                raise FileNotFoundError(
-                    f"Parakeet: файл не найден: {path}\n"
-                    "Скачайте модель: "
-                    "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
-                    "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
-                )
+        if not Path(self._encoder).exists():
+            print("Parakeet: модель не найдена, скачиваю (~640 МБ)...")
+            from download_models import download_parakeet
+            download_parakeet()
 
         logger.info("ParakeetTranscriber: загрузка модели...", encoder=self._encoder)
         self._recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(

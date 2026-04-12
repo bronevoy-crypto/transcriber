@@ -69,10 +69,48 @@ def download_sherpa_rnnt() -> None:
     print("GigaAM v3 sherpa-onnx RNNT скачана: models/gigaam-v3-rnnt/")
 
 
+def download_parakeet() -> None:
+    import urllib.request
+    import tarfile
+    import shutil
+
+    url = (
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
+        "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
+    )
+    dest_dir = Path("models/parakeet")
+    archive = Path("models/parakeet.tar.bz2")
+
+    print("Скачивание Parakeet TDT v3 (~640 МБ)...")
+    dest_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    from tqdm import tqdm
+    with urllib.request.urlopen(url) as src, open(archive, "wb") as out:
+        total = int(src.info().get("Content-Length", 0))
+        with tqdm(total=total, unit="iB", unit_scale=True, ncols=70) as bar:
+            while chunk := src.read(8192):
+                out.write(chunk)
+                bar.update(len(chunk))
+
+    print("Распаковка...")
+    with tarfile.open(archive, "r:bz2") as tar:
+        members = tar.getmembers()
+        # верхний каталог в архиве — убираем его prefix
+        top = members[0].name.split("/")[0]
+        for m in members:
+            m.name = m.name[len(top) + 1:]
+            if m.name:
+                tar.extract(m, dest_dir)
+
+    archive.unlink()
+    print(f"Parakeet скачана: {dest_dir}/")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--rnnt", action="store_true", help="Скачать e2e RNNT вместо CTC")
     parser.add_argument("--sherpa", action="store_true", help="Скачать sherpa-onnx версию")
+    parser.add_argument("--parakeet", action="store_true", help="Скачать Parakeet TDT v3")
     parser.add_argument("--all", action="store_true", help="Скачать все модели")
     args = parser.parse_args()
 
@@ -81,6 +119,9 @@ if __name__ == "__main__":
         download_e2e_rnnt()
         download_sherpa_ctc()
         download_sherpa_rnnt()
+        download_parakeet()
+    elif args.parakeet:
+        download_parakeet()
     elif args.sherpa and args.rnnt:
         download_sherpa_rnnt()
     elif args.sherpa:
