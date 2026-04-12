@@ -1,13 +1,39 @@
-pyaudiowpatch
-numpy
-structlog
-pyyaml
-torch
-torchaudio
-sherpa-onnx
-faster-whisper
-scipy
-huggingface_hub
+# ──────────────────────────────────────────────────────────────────────────────
+# PyTorch устанавливается отдельно — нужен вариант под твою версию CUDA:
+#
+#   CUDA 12.4 (RTX 40xx / 50xx):
+#     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#
+#   CUDA 11.8:
+#     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+#   CPU only:
+#     pip install torch torchaudio
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# GigaAM и T-one не в PyPI, ставятся так:
+#   pip install --no-deps git+https://github.com/salute-developers/GigaAM.git
+#   pip install --no-deps git+https://github.com/voicekit-team/T-one.git
+#   pip install pyctcdecode
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Захват звука
+PyAudioWPatch>=0.2.12
+
+# Аудио-обработка
+numpy>=1.23
+scipy>=1.10
+soundfile>=0.12
+
+# Утилиты
+pyyaml>=6.0
+structlog>=23.0
+python-dotenv>=1.0
+
+# Транскрибация
+sherpa-onnx>=1.12
+faster-whisper>=1.0
+huggingface_hub>=0.20
+
+# Диаризация
 pyannote.audio>=3.3,<4.0
-soundfile
-python-dotenv
