@@ -45,7 +45,7 @@ class GigaAMTranscriber(BaseTranscriber):
             raise FileNotFoundError(
                 f"GigaAM CTC модель не найдена: {model_path}\n"
                 "Скачайте модель:\n"
-                "  python download_models.py"
+                "  python download_models.py --sherpa"
             )
 
         logger.info("GigaAMTranscriber: загрузка CTC...", model=model_path)
@@ -68,7 +68,7 @@ class GigaAMTranscriber(BaseTranscriber):
             raise FileNotFoundError(
                 f"GigaAM RNNT модель не найдена: {encoder}\n"
                 "Скачайте модель:\n"
-                "  python download_models.py"
+                "  python download_models.py --sherpa --rnnt"
             )
 
         logger.info("GigaAMTranscriber: загрузка RNNT...", encoder=encoder)
