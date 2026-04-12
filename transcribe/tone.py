@@ -35,7 +35,14 @@ class ToneTranscriber(BaseTranscriber):
         try:
             from tone import StreamingCTCPipeline, DecoderType
         except ImportError:
-            raise ImportError("Установите T-one: pip install tone")
+            print("T-one: пакет не установлен, устанавливаю...")
+            import subprocess, sys
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", "--no-deps",
+                "git+https://github.com/voicekit-team/T-one.git",
+            ])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyctcdecode"])
+            from tone import StreamingCTCPipeline, DecoderType
 
         logger.info("ToneTranscriber: загрузка модели с HuggingFace...")
         # DecoderType.GREEDY не требует KenLM (бинарные биндинги не собираются

@@ -31,7 +31,7 @@ model:
     tokens_path: "models/parakeet/tokens.txt"
     num_threads: 2
   tone:
-    num_threads: 2
+    decoder: "greedy"  # "greedy" или "beam_search" (beam_search требует kenlm)
 
 diarization:
   enabled: true
