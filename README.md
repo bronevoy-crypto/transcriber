@@ -205,7 +205,7 @@ T-one качает модель сам с HuggingFace при первом зап
 │  AudioCapture     │   WASAPI loopback + микрофон
 │  (audio/capture)  │   (два потока PortAudio, микс 50/50)
 └─────────┬─────────┘
-          │
+          │  int16 mono 16kHz
           ▼
 ┌───────────────────┐
 │   VADProcessor    │   Silero VAD — is_speech(chunk) → bool
@@ -217,7 +217,7 @@ T-one качает модель сам с HuggingFace при первом зап
 │  State machine    │   speech_buffer / pending_silence / silence_start
 │  в main.py        │   Режет на сегменты когда пауза ≥ silence_duration
 └─────────┬─────────┘
-          │
+          │  audio_segment (np.int16)
           ▼
 ┌───────────────────┐
 │   Transcriber     │   BaseTranscriber → TranscriptionResult(text, words)
@@ -229,7 +229,7 @@ T-one качает модель сам с HuggingFace при первом зап
 │    JSONWriter     │   Инкрементально пишет сегменты в meetings/*.json
 │  (output/writer)  │
 └─────────┬─────────┘
-          │
+          │   -- Ctrl+C: запись закончилась --
           ▼
 ┌───────────────────┐
 │  Diarizer         │   Запускает pyannote в отдельном subprocess
@@ -237,7 +237,7 @@ T-one качает модель сам с HuggingFace при первом зап
 │  diarizer.py →    │   процесса, гарантированное освобождение памяти)
 │  diarize_worker)  │
 └─────────┬─────────┘
-          │
+          │  timeline = [{start, end, speaker}]
           ▼
 ┌───────────────────┐
 │  assign_speakers  │   Пришивает спикеров к сегментам:
