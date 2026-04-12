@@ -1,7 +1,10 @@
 """Запуск: python main.py  |  Остановка: Ctrl+C"""
+import json
 import os
 import signal
+import sys
 import time
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -81,7 +84,6 @@ def main(auto_stop_sec: float | None = None) -> None:
         "diarization": diar_cfg.get("enabled", False),
     })
 
-    import math
     max_segment_chunks = int(180_000 / chunk_ms)  # принудительная нарезка каждые 180 сек
 
     # speech_buffer копит активную речь, pending_silence — тишину ПОСЛЕ речи
@@ -240,7 +242,6 @@ def main(auto_stop_sec: float | None = None) -> None:
                     max_speakers=diar_cfg.get("max_speakers"),
                 )
                 if timeline:
-                    import json
                     with open(output_path, encoding="utf-8") as f:
                         data = json.load(f)
 
@@ -266,8 +267,7 @@ def main(auto_stop_sec: float | None = None) -> None:
                     print(f"Диаризация завершена. Найдено дикторов: {speakers}, интервалов: {len(timeline)}", flush=True)
                 else:
                     print("Диаризация: спикеры не найдены (запись слишком короткая или один голос). Метки не обновлены.", flush=True)
-            except BaseException as e:
-                import traceback, sys
+            except Exception as e:
                 print(f"[Диаризация] ОШИБКА: {type(e).__name__}: {e}", flush=True)
                 traceback.print_exc()
                 sys.stdout.flush()
@@ -275,9 +275,8 @@ def main(auto_stop_sec: float | None = None) -> None:
 
 
 if __name__ == "__main__":
-    import sys as _sys
     _duration = None
-    for _arg in _sys.argv[1:]:
+    for _arg in sys.argv[1:]:
         if _arg.startswith("--duration="):
             _duration = float(_arg.split("=")[1])
     main(auto_stop_sec=_duration)
